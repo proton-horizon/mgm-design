@@ -1,0 +1,40 @@
+{
+  "name": "mgm-design",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "pnpm dev:site",
+    "build": "tsc -b && vite build",
+    "preview": "wrangler dev --ip 127.0.0.1",
+    "format": "prettier --write src worker scripts tests docs website README.md AGENTS.md",
+    "dev:site": "pnpm build && wrangler dev --ip 127.0.0.1",
+    "typecheck:worker": "tsc -p worker/tsconfig.json",
+    "deploy:site": "node scripts/deploy.mjs --deploy",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250901.0",
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.5.0",
+    "esbuild": "^0.28.2",
+    "miniflare": "4.20260730.0",
+    "prettier": "^3.9.6",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.0",
+    "vitest": "^3.2.0",
+    "wrangler": "^4.0.0"
+  }
+}

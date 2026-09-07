@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Publish designs · MGM Design</title>
+    <link rel="stylesheet" href="../assets/styles.css" />
+  </head>
+  <body>
+    <header><a href="../index.html">MGM Design / Guide</a></header>
+    <main>
+      <h1>Keep designs with the app.</h1>
+      <p>
+        Mocks live under <code>design/</code> in the source app repository. MGM Design receives
+        browser-ready HTML, CSS, JavaScript, and runtime assets. Build source code and export models
+        in the app repository first.
+      </p>
+      <h2>Connect a repository</h2>
+      <ol>
+        <li>
+          Register the project in the destination site's administration screen and store its token
+          in your existing secrets system.
+        </li>
+        <li>
+          Create <code>design/manifest.json</code> using the
+          <a href="../../docs/backend.md">maintained bundle contract</a>. Declare boards, screen
+          entries and viewport sizes, and explicitly list all runtime files.
+        </li>
+        <li>
+          Run the shared publisher from the app repository with its site URL, project ID, and token
+          supplied through the environment.
+        </li>
+        <li>
+          Add a separate workflow for pushes to main. Keep its outcome independent from the app's
+          production deployment.
+        </li>
+      </ol>
+      <pre><code>MGM_SITE_URL=https://design.example.com MGM_PROJECT_ID=my-app \
+  node /path/to/mgm-design/scripts/publish.mjs</code></pre>
+      <p>
+        Supply <code>MGM_PUBLISH_TOKEN</code> through existing secret wiring. These names are
+        examples for mapping configuration, not a requirement to move or rename secrets. Multiple
+        destinations need separate URLs and tokens with independent outcomes.
+      </p>
+      <h2>When something goes wrong</h2>
+      <p>
+        The viewer keeps the last successful designs. Its publication indicator shows when a newer
+        attempt failed or stopped reporting progress, with a link to the GitHub Actions run when
+        provided. If the site was unreachable, GitHub Actions may be the only record of the failed
+        attempt.
+      </p>
+      <p>
+        The publisher registers before reading and validating the bundle. To report an earlier
+        compilation/export failure on the site, register an attempt through the API before that
+        build and report its result. See the contract for the exact endpoints.
+      </p>
+      <h2>How it works</h2>
+      <p>
+        Only explicitly listed files are uploaded. The server validates the complete set, stores it
+        under an isolated publication ID, then changes the visible pointer atomically. Old or failed
+        uploads cannot replace a newer successful set. Publishing does not deploy the viewer or need
+        Cloudflare account credentials.
+      </p>
+      <aside>
+        Published files must exclude secrets, editable Blender masters, briefs, and build-only
+        inputs. Bundle the runtime dependencies that the mock actually uses. Uploading a GLB or a
+        JavaScript library does not by itself prove that its browser features work in the sandbox.
+      </aside>
+    </main>
+    <footer>A workspace for your designs.</footer>
+  </body>
+</html>

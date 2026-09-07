@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manage access · MGM Design</title>
+    <link rel="stylesheet" href="../assets/styles.css" />
+  </head>
+  <body>
+    <header><a href="../index.html">MGM Design / Guide</a></header>
+    <main>
+      <h1>A small, private workspace.</h1>
+      <p>
+        Accounts use email and password. A site admin creates accounts and shares credentials
+        directly. There are no invitation or password-reset emails.
+      </p>
+      <h2>First-time setup</h2>
+      <p>
+        The installation owner configures a secret setup key when deploying. The first visit asks
+        for that key, an email, name, and a password of at least 12 characters. Successful setup
+        permanently closes this route and signs in the first site admin.
+      </p>
+      <h2>People</h2>
+      <p>
+        Open Site administration → People to add viewers or site admins. Everyone can browse all
+        projects on that installation. Admins also manage people, register projects, and replace
+        publishing tokens. Reset a password and share it directly, or disable an account to remove
+        access. Account changes invalidate its existing sessions.
+      </p>
+      <h2>Projects and tokens</h2>
+      <p>
+        Add a project using its display name and a stable lowercase ID matching its manifest. Copy
+        the publishing token when it is shown; it cannot be revealed later. Store it using the
+        source repository's existing secret system. Replacing it invalidates the previous publishing
+        credential, so update the source workflow too.
+      </p>
+      <h2>How it works</h2>
+      <p>
+        The server stores password and credential hashes and checks access on every protected
+        request. A publishing token can update only its own project. The browser uses a separate
+        account session. Disabling an account or signing out also revokes that session's preview
+        URLs.
+      </p>
+      <p>
+        For admin lockout, the owner can recover through privileged database access. See the
+        <a href="../../docs/backend.md">backend recovery instructions</a>. Do not reopen the
+        bootstrap route.
+      </p>
+    </main>
+    <footer>A workspace for your designs.</footer>
+  </body>
+</html>

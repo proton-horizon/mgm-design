@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Explore a board · MGM Design</title>
+    <link rel="stylesheet" href="../assets/styles.css" />
+  </head>
+  <body>
+    <header><a href="../index.html">MGM Design / Guide</a></header>
+    <main>
+      <h1>See the whole picture.</h1>
+      <p>
+        Open a project in the left sidebar, then choose a board such as App or Clothing. On a phone,
+        open Projects from the menu in the top-left corner. Search narrows the project list.
+      </p>
+      <h2>Pan mode</h2>
+      <p>
+        Drag the canvas or use two-finger scrolling to move around. Pinch to zoom. On desktop, hold
+        Command or Control while scrolling to zoom around the pointer. The bottom controls zoom,
+        restore actual size, and fit all screens. The small overview map recenters the canvas.
+      </p>
+      <table>
+        <tr>
+          <th>Key</th>
+          <th>Action while the canvas has focus</th>
+        </tr>
+        <tr>
+          <td>F or 0</td>
+          <td>Fit all screens</td>
+        </tr>
+        <tr>
+          <td>1</td>
+          <td>Actual size</td>
+        </tr>
+        <tr>
+          <td>+ / −</td>
+          <td>Zoom</td>
+        </tr>
+        <tr>
+          <td>Arrow keys</td>
+          <td>Pan</td>
+        </tr>
+        <tr>
+          <td>Command / Control + K</td>
+          <td>Find a project</td>
+        </tr>
+      </table>
+      <h2>Interact mode</h2>
+      <p>
+        Select a screen or choose it from Jump to screen, then press Interact. The focused screen
+        accepts clicks and touch gestures. Use previous/next to switch screens and Back to canvas to
+        continue exploring. A screen may restart when you open it or return to it.
+      </p>
+      <h2>How it works</h2>
+      <p>
+        Each screen is a separate HTML document displayed at the size declared by its app
+        repository. The canvas moves and scales those documents together. Pan mode captures
+        gestures; Interact mode passes input to the selected document. The sandbox prevents mock
+        code from accessing your account or administration APIs.
+      </p>
+      <p>
+        Refresh designs loads the site's latest successful publication. An unsuccessful newer
+        publication leaves the existing designs visible. Use the publication status at the top for
+        details.
+      </p>
+    </main>
+    <footer>A workspace for your designs.</footer>
+  </body>
+</html>

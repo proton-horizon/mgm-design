@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Install and update · MGM Design</title>
+    <link rel="stylesheet" href="../assets/styles.css" />
+  </head>
+  <body>
+    <header><a href="../index.html">MGM Design / Guide</a></header>
+    <main>
+      <h1>One site, its own workspace.</h1>
+      <p>
+        Each Cloudflare installation uses a dedicated Worker, D1 database, and private R2 bucket. It
+        can use a custom domain or its matching workers.dev hostname. The viewer and protected mocks
+        share that one hostname.
+      </p>
+      <h2>Deploy</h2>
+      <p>
+        Follow the <a href="../../README.md">README setup commands</a>. Configure the instance's
+        Worker name, database name and ID, bucket name, site URL and display name using your
+        existing environment conventions. Set <code>SETUP_SECRET</code> as a Worker secret. Keep
+        customer configuration and credentials out of the shared MGM repository.
+      </p>
+      <p>
+        The deployment script generates a private local configuration, checks the Worker build,
+        applies database migrations, and deploys. A failed step stops the remaining sequence. Keep
+        the same database and bucket when updating.
+      </p>
+      <h2>Follow main automatically</h2>
+      <p>
+        Connect this repository's main branch to each Worker's Cloudflare Builds configuration,
+        using that installation's dedicated deployment credential and variables. Build with
+        <code>pnpm install --frozen-lockfile &amp;&amp; pnpm build</code> and deploy with
+        <code>node scripts/deploy.mjs --deploy</code>. Each installation configures its own update
+        pipeline.
+      </p>
+      <h2>Move to a custom hostname</h2>
+      <p>
+        Keep the Worker, database, and bucket. Change the configured site URL and attach the custom
+        domain. Users sign in again on the new hostname; source publishers must use the new
+        destination URL. Stored users and designs remain in the same database and bucket.
+      </p>
+      <h2>How it works</h2>
+      <p>
+        The framework build updates application code and assets. Mock publication is a separate API
+        operation. Database migrations must remain compatible with the running code; back up
+        persistent data before changing schema. A daily cleanup removes expired sessions, preview
+        grants, and obsolete stored files.
+      </p>
+      <p>
+        The setup script and configuration isolation are tested locally. A live two-installation
+        automatic-update rollout and independently owned Cloudflare-account onboarding still need
+        validation.
+      </p>
+    </main>
+    <footer>A workspace for your designs.</footer>
+  </body>
+</html>
