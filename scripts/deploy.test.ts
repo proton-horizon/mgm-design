@@ -23,6 +23,7 @@ describe('instance deployment', () => {
     const paths = [
       [config.$schema, 'node_modules/wrangler/config-schema.json'],
       [config.main, 'worker/index.ts'],
+      [config.tsconfig, 'worker/tsconfig.json'],
       [config.assets.directory, 'dist'],
       [config.d1_databases[0].migrations_dir, 'migrations'],
     ];

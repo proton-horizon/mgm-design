@@ -42,7 +42,7 @@ pnpm --dir /path/to/mgm-design exec wrangler secret put SETUP_SECRET --config /a
 node /path/to/mgm-design/scripts/deploy.mjs --deploy --output deployments/design/.local/wrangler.json
 ```
 
-Ignore the generated configuration and private files in the owning project before generating them. The example directory is a convention, not a required secret location. `--output` accepts an absolute path or a path relative to the caller's working directory. Source, assets, migration, and schema paths are rebased to that file; regenerate it if either checkout moves. Wrangler runs from the output directory using MGM Design's installed CLI. Without `--output`, standalone use writes `wrangler.instance.json` in the MGM checkout.
+Ignore the generated configuration and private files in the owning project before generating them. The example directory is a convention, not a required secret location. `--output` accepts an absolute path or a path relative to the caller's working directory. Source, Worker TypeScript settings, assets, migration, and schema paths are rebased to that file; regenerate it if either checkout moves. Wrangler runs from the output directory using MGM Design's installed CLI. Without `--output`, standalone use writes `wrangler.instance.json` in the MGM checkout.
 
 Deployment first checks bundling, then applies D1 migrations, then deploys; a failure stops later steps. The Worker serves the viewer, API, and protected mock paths on one hostname. Existing D1/R2 bindings must remain stable across updates. Back up both before schema changes.
 

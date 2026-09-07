@@ -68,6 +68,7 @@ export function createConfig(env, outputPath = resolve(root, configFile)) {
       ? { account_id: required(env, 'CLOUDFLARE_ACCOUNT_ID', /^[a-f0-9]{32}$/i) }
       : {}),
     main: sourcePath('worker/index.ts'),
+    tsconfig: sourcePath('worker/tsconfig.json'),
     compatibility_date: '2026-09-07',
     compatibility_flags: ['nodejs_compat'],
     workers_dev: workersDev,

@@ -4,7 +4,7 @@ MGM Design is a React/TypeScript web app built with Vite. `src/App.tsx` owns sig
 
 The Worker serves built assets, checks accounts, and delivers private mocks. See [the backend contract](backend.md) for API and publication details. Source code has no built-in customer projects. The project list comes from the installation API.
 
-An installation's deploying project owns its settings, private local files, and deployment workflow. `scripts/deploy.mjs --output <path>` generates configuration there and rebases source, assets, migrations, and schema paths to the MGM checkout. Explicit relative output paths resolve against the caller's directory. Wrangler runs from the configuration's directory using the CLI installed with MGM Design; all deployment steps use the same configuration. The default output remains `wrangler.instance.json` in the MGM checkout for standalone use. Generated paths must be refreshed if either checkout moves. See the [installation guide](../website/features/installation.html) for setup.
+An installation's deploying project owns its settings, private local files, and deployment workflow. `scripts/deploy.mjs --output <path>` generates configuration there and rebases source, Worker TypeScript settings, assets, migrations, and schema paths to the MGM checkout. Explicit relative output paths resolve against the caller's directory. Wrangler runs from the configuration's directory using the CLI installed with MGM Design; all deployment steps use the same configuration. The default output remains `wrangler.instance.json` in the MGM checkout for standalone use. Generated paths must be refreshed if either checkout moves. See the [installation guide](../website/features/installation.html) for setup.
 
 ## Navigation and presentation
 
