@@ -1,4 +1,5 @@
 import { contentType, decodeBundle, safePath, type Manifest } from './bundle.mjs';
+import { passwordHash as derivePasswordHash } from './passwords';
 
 export interface Env {
   DB: D1Database;
@@ -103,15 +104,7 @@ async function hash(value: string) {
   ).join('');
 }
 async function passwordHash(password: string, salt = random(), iterations = 600000) {
-  const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, [
-    'deriveBits',
-  ]);
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: encoder.encode(salt), iterations, hash: 'SHA-256' },
-    key,
-    256,
-  );
-  return `pbkdf2-sha256:${iterations}:${salt}:${Array.from(new Uint8Array(bits), (x) => x.toString(16).padStart(2, '0')).join('')}`;
+  return derivePasswordHash(password, salt, iterations);
 }
 function equal(a: string, b: string) {
   let diff = a.length ^ b.length;
