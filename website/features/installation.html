@@ -19,13 +19,17 @@
       <p>
         Follow the <a href="../../README.md">README setup commands</a>. Configure the instance's
         Worker name, database name and ID, bucket name, site URL and display name using your
-        existing environment conventions. Set <code>SETUP_SECRET</code> as a Worker secret. Keep
-        customer configuration and credentials out of the shared MGM repository.
+        existing environment conventions. The project that owns this installation also owns its
+        settings, deployment workflow, and credentials. Set <code>SETUP_SECRET</code> as a Worker
+        secret. Keep customer configuration and credentials out of the shared MGM repository.
       </p>
       <p>
-        The deployment script generates a private local configuration, checks the Worker build,
-        applies database migrations, and deploys. A failed step stops the remaining sequence. Keep
-        the same database and bucket when updating.
+        Give the deployment script <code>--output &lt;path&gt;</code> to generate configuration in
+        the owning project. Relative paths start from the directory where you run the command.
+        Ignore that generated file and private files in the owning project's Git configuration. The
+        script points back to the MGM source checkout, checks the Worker build, applies database
+        migrations, and deploys. A failed step stops the remaining sequence. Keep the same database
+        and bucket when updating.
       </p>
       <p>
         After deploying, verify first-time setup and sign-in on the actual site. Password hashing
@@ -35,11 +39,11 @@
       </p>
       <h2>Follow main automatically</h2>
       <p>
-        Connect this repository's main branch to each Worker's Cloudflare Builds configuration,
-        using that installation's dedicated deployment credential and variables. Build with
-        <code>pnpm install --frozen-lockfile &amp;&amp; pnpm build</code> and deploy with
-        <code>node scripts/deploy.mjs --deploy</code>. Each installation configures its own update
-        pipeline.
+        Each installation configures its own update pipeline and credentials. That pipeline fetches
+        MGM Design's main branch, installs dependencies, builds the framework, and deploys using the
+        installation's settings and output path. A direct Cloudflare Builds checkout of MGM Design
+        can use the script's default output location, with settings held in the Worker's build
+        configuration. See the README for command and build-identifier details.
       </p>
       <h2>Move to a custom hostname</h2>
       <p>
@@ -55,9 +59,9 @@
         grants, and obsolete stored files.
       </p>
       <p>
-        The setup script and configuration isolation are tested locally. A live two-installation
-        automatic-update rollout and independently owned Cloudflare-account onboarding still need
-        validation.
+        The setup script and configuration isolation are tested locally. Automatic upstream updates
+        through a separate owning repository, a live two-installation rollout, and independently
+        owned Cloudflare-account onboarding still need validation.
       </p>
     </main>
     <footer>A workspace for your designs.</footer>

@@ -19,7 +19,7 @@ Open the printed localhost URL. Create the first admin using your local setup ke
 
 ## Install on Cloudflare
 
-Provision a dedicated Worker, D1 database, and private R2 bucket for each installation. Configure these nonsecret environment variables using your existing deployment configuration:
+Provision a dedicated Worker, D1 database, and private R2 bucket for each installation. The deploying project owns its instance settings, deployment workflow, and credentials; MGM Design supplies reusable source and scripts. Configure these nonsecret environment variables using that project's existing deployment configuration:
 
 ```text
 MGM_WORKER_NAME
@@ -33,17 +33,22 @@ MGM_SITE_NAME
 `MGM_SITE_URL` is an HTTPS origin: your custom domain or the Worker's matching `workers.dev` address. `CLOUDFLARE_ACCOUNT_ID` is optional when your login selects one account. Authenticate Wrangler for your account and set the Worker's `SETUP_SECRET` as a secret. Do not put credentials in shared source.
 
 ```sh
-pnpm build
-node scripts/deploy.mjs --config-only
-pnpm exec wrangler secret put SETUP_SECRET --config wrangler.instance.json
-node scripts/deploy.mjs --deploy
+# Install dependencies and build in your MGM Design checkout first.
+pnpm --dir /path/to/mgm-design install --frozen-lockfile
+pnpm --dir /path/to/mgm-design build
+# Run from the project that owns the installation.
+node /path/to/mgm-design/scripts/deploy.mjs --config-only --output deployments/design/.local/wrangler.json
+pnpm --dir /path/to/mgm-design exec wrangler secret put SETUP_SECRET --config /absolute/path/to/owner/deployments/design/.local/wrangler.json
+node /path/to/mgm-design/scripts/deploy.mjs --deploy --output deployments/design/.local/wrangler.json
 ```
 
-The generator writes ignored `wrangler.instance.json`. Deployment first checks bundling, then applies D1 migrations, then deploys; a failure stops later steps. The Worker serves the viewer, API, and protected mock paths on one hostname. Existing D1/R2 bindings must remain stable across updates. Back up both before schema changes.
+Ignore the generated configuration and private files in the owning project before generating them. The example directory is a convention, not a required secret location. `--output` accepts an absolute path or a path relative to the caller's working directory. Source, assets, migration, and schema paths are rebased to that file; regenerate it if either checkout moves. Wrangler runs from the output directory using MGM Design's installed CLI. Without `--output`, standalone use writes `wrangler.instance.json` in the MGM checkout.
+
+Deployment first checks bundling, then applies D1 migrations, then deploys; a failure stops later steps. The Worker serves the viewer, API, and protected mock paths on one hostname. Existing D1/R2 bindings must remain stable across updates. Back up both before schema changes.
 
 Generated and local configurations enable `nodejs_compat` for native password hashing. Verify account setup and login on the deployed Worker under its configured CPU limits; passing local tests does not establish production CPU headroom. See the [authentication contract](docs/backend.md#authentication).
 
-To follow `main`, connect this repository to each Worker's Cloudflare Builds integration. Configure the instance variables and a dedicated deployment credential in that installation. Build with `pnpm install --frozen-lockfile && pnpm build`; deploy with `node scripts/deploy.mjs --deploy`. The repository does not centrally hold customer credentials or a destination registry. Cross-account automatic-update installation has not been validated yet.
+Each installation owns its update pipeline and deployment credential. A pipeline following MGM Design's `main` must fetch that source, install and build it, then invoke the script with its own settings and output path. A direct Cloudflare Builds checkout of MGM Design can use the standalone default, with installation settings held in that Worker's build configuration. When a pipeline instead checks out the owning project, pass the actual MGM source commit as `WORKERS_CI_COMMIT_SHA` to the deploy script so the site's build identifier describes the deployed framework. The repository holds no customer credentials or destination registry. Cross-account updates and automatic upstream-triggered updates through a separate owning repository still need validation.
 
 ## Publish designs
 

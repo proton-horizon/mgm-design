@@ -19,6 +19,6 @@
     },
   ],
   "r2_buckets": [{ "binding": "MOCKS", "bucket_name": "mgm-design-local" }],
-  "vars": { "SITE_NAME": "Proton Horizon" },
+  "vars": { "SITE_NAME": "MGM Design" },
   "triggers": { "crons": ["0 3 * * *"] },
 }

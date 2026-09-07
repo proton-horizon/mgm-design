@@ -1,4 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createConfig, runDeployment } from './deploy.mjs';
 
 const env = {
@@ -9,8 +14,62 @@ const env = {
   MGM_SITE_URL: 'https://design.example.com',
   MGM_SITE_NAME: 'Example Design',
 };
+const sourceRoot = fileURLToPath(new URL('..', import.meta.url));
 
 describe('instance deployment', () => {
+  it('resolves framework files from an external consumer-owned configuration', () => {
+    const output = resolve(tmpdir(), 'consumer project/deployment/.local/wrangler.json');
+    const config = createConfig(env, output);
+    const paths = [
+      [config.$schema, 'node_modules/wrangler/config-schema.json'],
+      [config.main, 'worker/index.ts'],
+      [config.assets.directory, 'dist'],
+      [config.d1_databases[0].migrations_dir, 'migrations'],
+    ];
+    for (const [generated, source] of paths)
+      expect(resolve(dirname(output), generated)).toBe(resolve(sourceRoot, source));
+    const calls: string[][] = [];
+    runDeployment((args: string[]) => calls.push(args), output);
+    expect(calls).toHaveLength(3);
+    for (const args of calls) expect(args[args.indexOf('--config') + 1]).toBe(output);
+  });
+
+  it('generates private config from a consumer working directory with spaces', () => {
+    const consumer = mkdtempSync(resolve(tmpdir(), 'mgm consumer '));
+    try {
+      const script = resolve(sourceRoot, 'scripts/deploy.mjs');
+      const result = spawnSync(
+        process.execPath,
+        [script, '--output', 'deployment/.local/wrangler.json', '--config-only'],
+        {
+          cwd: consumer,
+          env,
+          encoding: 'utf8',
+        },
+      );
+      expect(result.status, result.stderr).toBe(0);
+      const output = resolve(consumer, 'deployment/.local/wrangler.json');
+      const config = JSON.parse(readFileSync(output, 'utf8'));
+      expect(resolve(dirname(output), config.main)).toBe(resolve(sourceRoot, 'worker/index.ts'));
+      expect(statSync(output).mode & 0o777).toBe(0o600);
+      for (const args of [
+        ['--output'],
+        ['--config-only', '--output'],
+        ['--deploy', '--config-only'],
+      ]) {
+        const invalid = spawnSync(process.execPath, [script, ...args], {
+          cwd: consumer,
+          env,
+          encoding: 'utf8',
+        });
+        expect(invalid.status).toBe(1);
+        expect(invalid.stderr).toContain('Usage:');
+      }
+    } finally {
+      rmSync(consumer, { recursive: true, force: true });
+    }
+  });
+
   it('keeps destinations separate and excludes credentials and local auth settings', () => {
     const first = createConfig({
       ...env,
