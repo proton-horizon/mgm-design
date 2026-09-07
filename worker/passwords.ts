@@ -1,60 +1,132 @@
-import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
-import { sha256 } from '@noble/hashes/sha2.js';
+import { scrypt, timingSafeEqual } from 'node:crypto';
 
-export const PASSWORD_ITERATIONS = 600000;
-const encoder = new TextEncoder();
+export const SCRYPT_N = 16384;
+export const SCRYPT_R = 8;
+export const SCRYPT_P = 5;
+export const SCRYPT_MAXMEM = 24 * 1024 * 1024;
+export const PASSWORD_KEY_BYTES = 32;
+export const DUMMY_PASSWORD_HASH = `scrypt:${SCRYPT_N}:${SCRYPT_R}:${SCRYPT_P}:${'0'.repeat(64)}:${'0'.repeat(64)}`;
 
-/** Computes standard PBKDF2-HMAC-SHA256 with a 32-byte result, preserving UTF-8 input bytes. */
-export type NativePbkdf2 = (
-  password: Uint8Array,
-  salt: Uint8Array,
-  iterations: number,
-) => Promise<Uint8Array>;
-
-const nativePbkdf2: NativePbkdf2 = async (password, salt, iterations) => {
-  const key = await crypto.subtle.importKey('raw', password, 'PBKDF2', false, ['deriveBits']);
-  return new Uint8Array(
-    await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations, hash: 'SHA-256' }, key, 256),
-  );
-};
+export interface PasswordVerification {
+  valid: boolean;
+  needsRehash: boolean;
+}
 
 /**
- * Hashes new credentials at 600,000 iterations and verifies the initial 100,000-iteration format.
- * Native and portable derivation produce identical bytes. Only native NotSupportedError selects
- * the portable implementation; unexpected runtime failures propagate without weakening the hash.
+ * Creates randomly salted credentials and verifies bounded, recognized stored formats.
+ * Verification never modifies persistence; a valid legacy record requests an atomic replacement.
+ * Unsupported native legacy derivation throws PasswordCompatibilityError, preserving the record.
  */
-export async function passwordHash(
-  password: string,
-  salt: string,
-  iterations = PASSWORD_ITERATIONS,
-  native: NativePbkdf2 = nativePbkdf2,
-): Promise<string> {
-  if (![100000, PASSWORD_ITERATIONS].includes(iterations)) {
-    throw new RangeError('Unsupported stored password work factor.');
+export interface PasswordHasher {
+  hash(password: string): Promise<string>;
+  verify(password: string, record: string): Promise<PasswordVerification>;
+}
+
+/** Native derivation boundary. Inputs are UTF-8 password and UTF-8 hexadecimal salt bytes. */
+export interface PasswordKdf {
+  scrypt(password: Uint8Array, salt: Uint8Array): Promise<Uint8Array>;
+  pbkdf2(password: Uint8Array, salt: Uint8Array, iterations: 100000 | 600000): Promise<Uint8Array>;
+}
+
+export class PasswordCompatibilityError extends Error {
+  constructor() {
+    super('The stored password format is not supported by this runtime.');
+    this.name = 'PasswordCompatibilityError';
   }
-  const passwordBytes = encoder.encode(password);
-  const saltBytes = encoder.encode(salt);
-  let bits: Uint8Array;
-  try {
-    bits = await native(passwordBytes, saltBytes, iterations);
-  } catch (error) {
-    const name = error instanceof Error ? error.name : 'UnknownError';
-    if (name !== 'NotSupportedError') {
-      console.error('Native password derivation failed', { name });
+}
+
+const encoder = new TextEncoder();
+const invalid: PasswordVerification = Object.freeze({ valid: false, needsRehash: false });
+const nativeKdf: PasswordKdf = {
+  scrypt(password, salt) {
+    return new Promise((resolve, reject) => {
+      scrypt(
+        password,
+        salt,
+        PASSWORD_KEY_BYTES,
+        {
+          N: SCRYPT_N,
+          r: SCRYPT_R,
+          p: SCRYPT_P,
+          maxmem: SCRYPT_MAXMEM,
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(new Uint8Array(result));
+        },
+      );
+    });
+  },
+  async pbkdf2(password, salt, iterations) {
+    const key = await crypto.subtle.importKey('raw', password, 'PBKDF2', false, ['deriveBits']);
+    return new Uint8Array(
+      await crypto.subtle.deriveBits(
+        { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+        key,
+        256,
+      ),
+    );
+  },
+};
+
+function hex(bytes: Uint8Array) {
+  return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
+}
+
+function compare(result: Uint8Array, expected: string) {
+  if (result.length !== PASSWORD_KEY_BYTES)
+    throw new Error('Unexpected password derivation length.');
+  const bytes = new Uint8Array(PASSWORD_KEY_BYTES);
+  for (let i = 0; i < bytes.length; i++)
+    bytes[i] = Number.parseInt(expected.slice(i * 2, i * 2 + 2), 16);
+  return timingSafeEqual(result, bytes);
+}
+
+export class NativePasswordHasher implements PasswordHasher {
+  constructor(private readonly kdf: PasswordKdf = nativeKdf) {}
+
+  async hash(password: string): Promise<string> {
+    if (typeof password !== 'string' || password.length < 12 || password.length > 256) {
+      throw new RangeError('Password must contain 12–256 characters.');
+    }
+    const salt = hex(crypto.getRandomValues(new Uint8Array(32)));
+    const result = await this.kdf.scrypt(encoder.encode(password), encoder.encode(salt));
+    if (result.length !== PASSWORD_KEY_BYTES)
+      throw new Error('Unexpected password derivation length.');
+    return `scrypt:${SCRYPT_N}:${SCRYPT_R}:${SCRYPT_P}:${salt}:${hex(result)}`;
+  }
+
+  async verify(password: string, record: string): Promise<PasswordVerification> {
+    if (
+      typeof password !== 'string' ||
+      password.length > 256 ||
+      typeof record !== 'string' ||
+      record.length > 160
+    )
+      return invalid;
+    // Exact whitelists bound cost and allocation before entering either native derivation.
+    const current = /^scrypt:16384:8:5:([a-f0-9]{64}):([a-f0-9]{64})$/.exec(record);
+    if (current) {
+      const result = await this.kdf.scrypt(encoder.encode(password), encoder.encode(current[1]));
+      return { valid: compare(result, current[2]), needsRehash: false };
+    }
+    const legacy = /^pbkdf2-sha256:(100000|600000):([a-f0-9]{64}):([a-f0-9]{64})$/.exec(record);
+    if (!legacy) return invalid;
+    let result: Uint8Array;
+    try {
+      result = await this.kdf.pbkdf2(
+        encoder.encode(password),
+        encoder.encode(legacy[2]),
+        Number(legacy[1]) as 100000 | 600000,
+      );
+    } catch (error) {
+      if (error instanceof Error && error.name === 'NotSupportedError')
+        throw new PasswordCompatibilityError();
       throw error;
     }
-    // Runtime iteration ceilings differ between local workerd and deployed Cloudflare Workers.
-    const limit =
-      error instanceof Error
-        ? error.message.match(/iteration counts above (\d+) are not supported/i)?.[1]
-        : undefined;
-    console.warn('Native PBKDF2 unsupported; using portable PBKDF2 with unchanged work factor', {
-      name,
-      iterations,
-      ...(limit ? { nativeIterationLimit: Number(limit) } : {}),
-    });
-    bits = await pbkdf2Async(sha256, passwordBytes, saltBytes, { c: iterations, dkLen: 32 });
+    const valid = compare(result, legacy[3]);
+    return { valid, needsRehash: valid };
   }
-  const hex = Array.from(bits, (value) => value.toString(16).padStart(2, '0')).join('');
-  return `pbkdf2-sha256:${iterations}:${salt}:${hex}`;
 }
+
+export const passwordHasher: PasswordHasher = new NativePasswordHasher();

@@ -41,6 +41,8 @@ node scripts/deploy.mjs --deploy
 
 The generator writes ignored `wrangler.instance.json`. Deployment first checks bundling, then applies D1 migrations, then deploys; a failure stops later steps. The Worker serves the viewer, API, and protected mock paths on one hostname. Existing D1/R2 bindings must remain stable across updates. Back up both before schema changes.
 
+Generated and local configurations enable `nodejs_compat` for native password hashing. Verify account setup and login on the deployed Worker under its configured CPU limits; passing local tests does not establish production CPU headroom. See the [authentication contract](docs/backend.md#authentication).
+
 To follow `main`, connect this repository to each Worker's Cloudflare Builds integration. Configure the instance variables and a dedicated deployment credential in that installation. Build with `pnpm install --frozen-lockfile && pnpm build`; deploy with `node scripts/deploy.mjs --deploy`. The repository does not centrally hold customer credentials or a destination registry. Cross-account automatic-update installation has not been validated yet.
 
 ## Publish designs

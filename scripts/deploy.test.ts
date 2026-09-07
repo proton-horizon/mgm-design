@@ -26,6 +26,7 @@ describe('instance deployment', () => {
       MGM_R2_BUCKET_NAME: 'other-mocks',
     });
     expect(first.assets.run_worker_first).toBe(true);
+    expect(first.compatibility_flags).toContain('nodejs_compat');
     expect(first.vars).toEqual({ SITE_NAME: env.MGM_SITE_NAME, SITE_URL: env.MGM_SITE_URL });
     expect(JSON.stringify(first)).not.toContain('never-copy');
     expect(first.d1_databases[0].database_id).not.toBe(second.d1_databases[0].database_id);

@@ -63,6 +63,7 @@ export function createConfig(env) {
       : {}),
     main: 'worker/index.ts',
     compatibility_date: '2026-09-07',
+    compatibility_flags: ['nodejs_compat'],
     workers_dev: workersDev,
     preview_urls: false,
     routes: workersDev ? [] : [{ pattern: site.hostname, custom_domain: true }],

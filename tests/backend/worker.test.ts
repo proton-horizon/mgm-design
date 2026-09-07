@@ -82,6 +82,7 @@ beforeAll(async () => {
     format: 'esm',
     platform: 'browser',
     target: 'es2022',
+    external: ['node:crypto'],
   });
   mf = new Miniflare({
     workers: [
@@ -90,6 +91,7 @@ beforeAll(async () => {
         modules: true,
         script: output.outputFiles[0].text,
         compatibilityDate: '2026-07-01',
+        compatibilityFlags: ['nodejs_compat'],
         d1Databases: ['DB'],
         r2Buckets: ['MOCKS'],
         bindings: { SETUP_SECRET: 'test-bootstrap-secret-strong', SITE_NAME: 'Proton Horizon' },

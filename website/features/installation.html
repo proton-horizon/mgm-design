@@ -27,6 +27,12 @@
         applies database migrations, and deploys. A failed step stops the remaining sequence. Keep
         the same database and bucket when updating.
       </p>
+      <p>
+        After deploying, verify first-time setup and sign-in on the actual site. Password hashing
+        uses the Worker's native runtime and must fit the installation's CPU limit; local tests
+        cannot establish that limit. The generated configuration enables the required Node.js
+        compatibility setting.
+      </p>
       <h2>Follow main automatically</h2>
       <p>
         Connect this repository's main branch to each Worker's Cloudflare Builds configuration,

@@ -1,5 +1,5 @@
 import { contentType, decodeBundle, safePath, type Manifest } from './bundle.mjs';
-import { passwordHash as derivePasswordHash } from './passwords';
+import { passwordHasher, DUMMY_PASSWORD_HASH, PasswordCompatibilityError } from './passwords';
 
 export interface Env {
   DB: D1Database;
@@ -102,9 +102,6 @@ async function hash(value: string) {
     new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(value))),
     (x) => x.toString(16).padStart(2, '0'),
   ).join('');
-}
-async function passwordHash(password: string, salt = random(), iterations = 600000) {
-  return derivePasswordHash(password, salt, iterations);
 }
 function equal(a: string, b: string) {
   let diff = a.length ^ b.length;
@@ -316,7 +313,7 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
     const userId = crypto.randomUUID();
     const userEmail = email(input.email);
     const userName = requireText(input.name, 'name');
-    const digest = await passwordHash(password(input.password));
+    const digest = await passwordHasher.hash(password(input.password));
     await db.batch([
       [
         'INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO NOTHING',
@@ -340,14 +337,31 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
     const user = await db.one<User>('SELECT * FROM users WHERE email=?', userEmail);
     const candidate =
       typeof input.password === 'string' && input.password.length <= 256 ? input.password : '';
-    const stored = user?.password_hash.split(':');
-    const computed = await passwordHash(
-      candidate,
-      stored?.[2] || '0000000000000000000000000000000000000000000000000000000000000000',
-      stored?.[1] === '100000' ? 100000 : 600000,
-    );
-    if (!user || user.disabled || !equal(computed, user.password_hash))
+    let verification;
+    try {
+      verification = await passwordHasher.verify(
+        candidate,
+        user?.password_hash ?? DUMMY_PASSWORD_HASH,
+      );
+    } catch (error) {
+      if (!(error instanceof PasswordCompatibilityError)) throw error;
+      console.warn('Stored password requires an administrator reset on this runtime');
+      await passwordHasher.verify(candidate, DUMMY_PASSWORD_HASH);
       throw new HttpError(401, 'Email or password is incorrect.');
+    }
+    if (!user || user.disabled || !verification.valid)
+      throw new HttpError(401, 'Email or password is incorrect.');
+    if (verification.needsRehash) {
+      const upgraded = await passwordHasher.hash(candidate);
+      const result = await db.run(
+        'UPDATE users SET password_hash=? WHERE id=? AND password_hash=? AND disabled=0',
+        upgraded,
+        user.id,
+        user.password_hash,
+      );
+      if (!result.changes) throw new HttpError(401, 'Credentials changed. Please sign in again.');
+      user.password_hash = upgraded;
+    }
     return loginResponse(request, db, user);
   }
   if (path === '/api/logout' && method === 'POST') {
@@ -412,7 +426,7 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
       const userEmail = email(input.email);
       const name = requireText(input.name, 'name');
       const role = input.role === 'admin' ? 'admin' : 'viewer';
-      const digest = await passwordHash(password(input.password));
+      const digest = await passwordHasher.hash(password(input.password));
       if (await db.one('SELECT id FROM users WHERE email=?', userEmail))
         throw new HttpError(409, 'An account with this email already exists.');
       await db.run(
@@ -443,7 +457,7 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
       const digest =
         input.password === undefined
           ? target.password_hash
-          : await passwordHash(password(input.password));
+          : await passwordHasher.hash(password(input.password));
       const results = await db.batch([
         [
           "UPDATE users SET name=?,role=?,disabled=?,password_hash=? WHERE id=? AND ((?='admin' AND ?=0) OR role!='admin' OR disabled=1 OR (SELECT COUNT(*) FROM users WHERE role='admin' AND disabled=0)>1)",
