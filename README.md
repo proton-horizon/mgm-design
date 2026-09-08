@@ -74,13 +74,32 @@ Generated and local configurations enable `nodejs_compat` for native password ha
 
 Each installation owns its update pipeline and deployment credential. In that Worker's Cloudflare Builds settings, connect `proton-horizon/mgm-design`, select production branch `main`, and configure its own build token. Disable nonproduction/preview deployments. Copy the installation variables above from the owning project's settings into that Worker's build environment; synchronize them again when the owner changes settings. No private owner-repository checkout is needed during a framework build.
 
+Cloudflare Builds currently accepts [user-owned API tokens](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/#api-token). For this deployment, configure Workers Scripts edit and D1 edit, plus Workers R2 Storage read and Account Settings read on the destination account. For a custom hostname, add Workers Routes edit and Zone read only for its zone. These permissions are scoped to the account/zone, not an individual Worker, database, or bucket. Separate installation tokens allow independent revocation but do not restrict each token to that installation's resources within a shared account. Keep deployment tokens in Cloudflare Builds, separate from the project tokens used to publish mocks.
+
 Set `NODE_VERSION=24.18.0`, `PNPM_VERSION=11.19.0`, and `SKIP_DEPENDENCY_INSTALL=1`. Use this build command:
 
 ```sh
 pnpm install --frozen-lockfile && pnpm build && pnpm typecheck:worker && pnpm test
 ```
 
-Use `node scripts/deploy.mjs --deploy --output ../instance/wrangler.json` as the deployment step. Cloudflare supplies `WORKERS_CI_COMMIT_SHA`; it becomes the site's framework build identifier. Serialize deployments per installation and skip a superseded build only after successfully checking the current upstream `main` commit. A failed upstream lookup must fail the build visibly. The owning project's automation can wrap the deployment command to enforce this ordering.
+Use this deployment command. Cloudflare supplies `WORKERS_CI_COMMIT_SHA`; it becomes the site's framework build identifier. The guard skips superseded builds and fails visibly if the upstream commit cannot be resolved.
+
+```sh
+set -eu
+ref=$(git ls-remote https://github.com/proton-horizon/mgm-design.git refs/heads/main)
+sha=${ref%%[[:space:]]*}
+case "$sha" in
+  ""|*[!0-9a-f]*) echo "Cannot resolve upstream main" >&2; exit 1 ;;
+esac
+[ "${#sha}" -eq 40 ] || { echo "Invalid upstream commit" >&2; exit 1; }
+if [ "${WORKERS_CI_COMMIT_SHA:?Missing build commit}" = "$sha" ]; then
+  node scripts/deploy.mjs --deploy --output ../instance/wrangler.json
+else
+  echo "Skipping superseded framework commit"
+fi
+```
+
+Serialize deployments per installation. The commit guard alone cannot prevent an already-running deployment from overtaking a newer deployment. If relying on the account's concurrent-build limit of one, verify that limit during setup and add explicit serialization before increasing it.
 
 Creating instance variables alone does not enable automatic updates: each Worker needs a connected, enabled Builds trigger and an authorized build token. Once configured, pushes to MGM `main` update the framework without consumer version edits. The repository holds no customer credentials or destination registry. If your pipeline checks out the owning project instead, pass the actual MGM source commit as `WORKERS_CI_COMMIT_SHA` and keep the owner and framework checkouts as siblings.
 

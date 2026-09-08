@@ -15,6 +15,42 @@
         can use a custom domain or its matching workers.dev hostname. The viewer and protected mocks
         share that one hostname.
       </p>
+      <h2>Why one Worker per site?</h2>
+      <p>
+        A Worker runs the viewer, sign-in, administration, and publishing API. Its D1 database holds
+        accounts, sessions, projects, and publication records. Its private R2 bucket holds the mock
+        files. Adding another project to the sidebar uses this same installation; it does not need
+        another Worker.
+      </p>
+      <p>
+        A separate client or design collection gets its own installation and resources when needed.
+        A single design site needs only one installation. Each site can continue operating under
+        its owner's control.
+      </p>
+      <h2>Two independent update flows</h2>
+      <div class="cards">
+        <section class="card">
+          <h3>Update MGM Design</h3>
+          <p>
+            Push framework code to MGM's main branch. Each connected installation's Cloudflare
+            Builds pipeline checks and deploys that code using its own settings. Accounts, projects,
+            and stored mocks stay in that site's database and bucket.
+          </p>
+        </section>
+        <section class="card">
+          <h3>Publish an app's designs</h3>
+          <p>
+            Push mocks in the app repository's <code>design/</code> directory to its main branch.
+            That repository's GitHub Actions job sends the bundle to MGM's publishing API. It uses
+            a project publishing token and does not redeploy the viewer.
+          </p>
+        </section>
+      </div>
+      <p>
+        A failed mock job does not block the app's production deployment. Each destination has its
+        own URL and publishing token, so an app can publish to several sites independently. See
+        <a href="publishing.html">Publish designs</a> for the source-repository setup.
+      </p>
       <h2>Deploy</h2>
       <p>
         Follow the <a href="../../README.md">README setup commands</a>. Configure the instance's
@@ -45,13 +81,58 @@
         the site's own database and bucket. No consumer version edits or private owner-repository
         checkout are needed. See the README for exact build settings and commands.
       </p>
+      <ol>
+        <li>Connect the shared MGM repository to the installation's existing Worker.</li>
+        <li>Select main as the production branch and disable preview deployments.</li>
+        <li>
+          Choose that installation's deployment token. Copy its account, Worker, database, bucket,
+          site URL, and display name into the build environment.
+        </li>
+        <li>
+          Copy the Node/pnpm versions, build command, and guarded deployment command from the
+          <a href="../../README.md">README</a>. Enable the build trigger.
+        </li>
+        <li>
+          Verify a main push produces a successful build and the expected framework commit at the
+          site, then confirm existing accounts and designs still work.
+        </li>
+      </ol>
+      <p>
+        Only one deployment may run at a time for an installation. The deployment command checks
+        the current main commit and skips outdated builds. That check does not replace serialization:
+        an older deployment already in progress must finish before another starts. If setup relies
+        on an account-wide build limit of one, check that limit before enabling updates and before
+        increasing build concurrency.
+      </p>
+      <h2>Credentials and MCP</h2>
+      <p>
+        Deployment tokens belong in Cloudflare Builds. Project publishing tokens belong in the
+        source app's existing secret storage. The first-admin setup secret belongs on the Worker.
+        None of these credentials belongs in a published mock or the shared MGM repository.
+      </p>
+      <p>
+        Cloudflare Builds currently uses user-owned API tokens. The README lists the permissions
+        needed for this deployment. They cover resources within an account or zone, not just one
+        named Worker. Separate tokens let an owner revoke each installation's automation
+        independently, but do not isolate the tokens' access to resources within a shared account.
+      </p>
+      <p>
+        A connected Cloudflare MCP can help inspect resources and build results, configure build
+        settings, and diagnose failures, provided its credential has the necessary permissions.
+        Creating user tokens also requires token-management permission; use the owner's signed-in
+        Cloudflare browser when the connected MCP credential does not have it. If an initial build
+        connection fails through the API, complete it in the dashboard, then use MCP for
+        deployment-token registration, build settings, and starting and inspecting builds. MCP
+        access and the deployment token are separate credentials. Ordinary
+        main-branch updates run in Cloudflare without an agent or browser session.
+      </p>
       <h2>Move to a custom hostname</h2>
       <p>
         Keep the Worker, database, and bucket. Change the configured site URL and attach the custom
         domain. Users sign in again on the new hostname; source publishers must use the new
         destination URL. Stored users and designs remain in the same database and bucket.
       </p>
-      <h2>How it works</h2>
+      <h2>Updates and recovery</h2>
       <p>
         The framework build updates application code and assets. Mock publication is a separate API
         operation. Database migrations must remain compatible with the running code; back up
@@ -64,6 +145,22 @@
         that Worker's build result in Cloudflare. A stopped or superseded build is separate from a
         source app's mock-publication result.
       </p>
+      <ul>
+        <li>
+          <strong>No framework build appeared:</strong> check the repository connection, main-branch
+          trigger, and whether builds are enabled for that Worker.
+        </li>
+        <li>
+          <strong>Framework build failed:</strong> inspect its Cloudflare build log for the failing
+          install, test, migration, or deployment step. Check token access and installation variables.
+          Fix the cause and retry against current main; do not replace the database or bucket.
+        </li>
+        <li>
+          <strong>Mocks are older than expected:</strong> inspect the project's latest publication
+          status and linked GitHub Actions run. A failed attempt leaves the last successful set
+          visible. If the job never reached MGM, GitHub Actions contains the failure report.
+        </li>
+      </ul>
     </main>
     <footer>A workspace for your designs.</footer>
   </body>
