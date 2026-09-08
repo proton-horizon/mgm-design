@@ -9,7 +9,8 @@
   },
   "scripts": {
     "dev": "pnpm dev:site",
-    "build": "tsc -b && vite build",
+    "dev:mocks": "pnpm build && node scripts/local-preview.mjs",
+    "build": "node scripts/notices.mjs && tsc -b && vite build",
     "preview": "wrangler dev --ip 127.0.0.1",
     "format": "prettier --write src worker scripts tests docs website README.md AGENTS.md",
     "dev:site": "pnpm build && wrangler dev --ip 127.0.0.1",

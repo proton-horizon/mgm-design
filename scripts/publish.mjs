@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-import { readFile, realpath, stat } from 'node:fs/promises';
-import { resolve, sep } from 'node:path';
+import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { MAX_BYTES, validateManifest } from '../worker/bundle.mjs';
+import { readBundle } from './read-bundle.mjs';
 
 const args = process.argv.slice(2);
 function option(name, fallback) {
@@ -58,23 +57,7 @@ try {
   };
   // Register first so missing files and local validation failures appear on the destination site.
   ({ attemptId } = await send(base, 'POST', metadata));
-  const manifest = validateManifest(
-    JSON.parse(await readFile(resolve(directory, 'manifest.json'), 'utf8')),
-    project,
-  );
-  const root = await realpath(directory);
-  const files = {};
-  let total = 0;
-  for (const path of manifest.files) {
-    const absolute = await realpath(resolve(directory, path));
-    if (!absolute.startsWith(root + sep))
-      throw new Error('A listed file resolves outside design/.');
-    const info = await stat(absolute);
-    if (!info.isFile()) throw new Error('Every listed path must resolve to a regular file.');
-    total += info.size;
-    if (total > MAX_BYTES) throw new Error('Bundle exceeds 20 MiB.');
-    files[path] = (await readFile(absolute)).toString('base64');
-  }
+  const { manifest, files } = await readBundle(directory, project);
   await send(`${base}/${attemptId}`, 'PUT', { manifest, files });
   console.log(
     `Published ${project}: ${manifest.boards.length} boards, ${manifest.files.length} files to ${url.origin}.`,

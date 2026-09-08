@@ -14,12 +14,16 @@ Each board shows its complete frame set in Pan mode. Frames use manifest coordin
 
 Select a screen or use Jump to screen, then choose Interact. A separate single-frame view receives pointer input while preserving the declared viewport and fitting the available space. Back to canvas returns to navigation. Previous/next switches frames. The canvas blocks iframe pointer input in Pan mode. Offscreen canvas frames are unmounted with a 200-pixel margin, reducing unnecessary runtime work; re-entering or refreshing can reset a mock's transient state.
 
-The overview map recenters the canvas. Responsive layouts and touch gestures are implemented; real-device rendering and browser-specific runtime support require separate verification. Preview grants refresh periodically, and Refresh designs fetches fresh publication data. Failed/unknown attempt status is separate from successfully active designs.
+The overview map recenters the canvas. Responsive layouts and touch gestures support desktop, iPhone, and iPad use. Preview grants refresh periodically, and Refresh designs fetches fresh publication data. Failed/unknown attempt status is separate from successfully active designs.
 
 ## Local development
 
 Install dependencies with `pnpm install`. Put a randomly generated local `SETUP_SECRET` in ignored `.dev.vars`. Run `pnpm exec wrangler d1 migrations apply DB --local`, then `pnpm dev:site`. Open the printed localhost URL and create a local account with the setup key. Local accounts and mocks persist under ignored `.wrangler/`; they are separate from hosted data.
 
-After frontend changes, run `pnpm build` while the Worker stays running; Wrangler picks up changed assets. The frontend and backend use one local origin, matching production sandbox and authentication behavior. Local preview uses the same account and publication contract; automatic sibling-folder watching and authentication bypass are not implemented.
+After frontend changes, run `pnpm build` while the Worker stays running; Wrangler picks up changed assets. The frontend and backend use one local origin, matching production sandbox and authentication behavior.
+
+For source-owned mock review, `pnpm dev:mocks --directory ../app/design` starts `scripts/local-preview.mjs`; repeat `--directory` for other projects. It creates an ephemeral workerd/D1/R2 installation and publishes through the same backend contract using credentials held only in memory. A proxy bound to `127.0.0.1` supplies the local session for read-only viewing. It checks the exact Host and Origin, blocks API mutations/admin access, and never exposes account cookies. The deployed Worker contains no login bypass. Protected mock requests still require their scoped grants and enforce the same sandbox/CSP.
+
+The local command polls source manifests and listed files, validates through the shared bundle reader, then activates a new immutable publication. The browser reloads when a publication changes, preserving its board URL but resetting mock interaction state. Invalid updates keep the previous publication and print a terminal error. Stop the command to discard local data. It does not compile/export source assets or send requests to a hosted installation.
 
 Use `pnpm build`, `pnpm typecheck:worker`, and `pnpm test`. Backend tests run isolated D1/R2 in workerd; canvas tests verify camera geometry; deployment tests verify configuration isolation and failure order. The human guide in `website/index.html` opens directly without a server.

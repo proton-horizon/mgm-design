@@ -42,6 +42,14 @@
         examples for mapping configuration, not a requirement to move or rename secrets. Multiple
         destinations need separate URLs and tokens with independent outcomes.
       </p>
+      <h2>Preview while working locally</h2>
+      <p>
+        Run <code>pnpm dev:mocks --directory ../my-app/design</code> in MGM Design. Add another
+        <code>--directory</code> for each app. Open the printed local URL; no sign-in or publishing
+        token is needed. Valid changes reload automatically. Invalid changes keep the previous
+        designs and report the problem in your terminal. This read-only workspace is temporary and
+        does not change your hosted sites. Stop the command when finished.
+      </p>
       <h2>When something goes wrong</h2>
       <p>
         The viewer keeps the last successful designs. Its publication indicator shows when a newer

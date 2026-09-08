@@ -39,11 +39,11 @@
       </p>
       <h2>Follow main automatically</h2>
       <p>
-        Each installation configures its own update pipeline and credentials. That pipeline fetches
-        MGM Design's main branch, installs dependencies, builds the framework, and deploys using the
-        installation's settings and output path. A direct Cloudflare Builds checkout of MGM Design
-        can use the script's default output location, with settings held in the Worker's build
-        configuration. See the README for command and build-identifier details.
+        In each Worker's Cloudflare Builds settings, connect MGM Design's main branch and configure
+        that installation's build token, variables, and commands. Keep those settings synchronized
+        with the project that owns the installation. Pushes to main then rebuild the framework with
+        the site's own database and bucket. No consumer version edits or private owner-repository
+        checkout are needed. See the README for exact build settings and commands.
       </p>
       <h2>Move to a custom hostname</h2>
       <p>
@@ -59,9 +59,10 @@
         grants, and obsolete stored files.
       </p>
       <p>
-        The setup script and configuration isolation are tested locally. Automatic upstream updates
-        through a separate owning repository, a live two-installation rollout, and independently
-        owned Cloudflare-account onboarding still need validation.
+        Instance variables alone do not enable updates. Each Worker needs an enabled Builds trigger
+        and an authorized build token. Failed builds leave the current application running; inspect
+        that Worker's build result in Cloudflare. A stopped or superseded build is separate from a
+        source app's mock-publication result.
       </p>
     </main>
     <footer>A workspace for your designs.</footer>
