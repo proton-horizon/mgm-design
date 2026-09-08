@@ -82,6 +82,11 @@
         checkout are needed. See the README for exact build settings and commands.
       </p>
       <ol>
+        <li>
+          In GitHub's installed Cloudflare Workers and Pages app settings, authorize the MGM
+          repository. When using selected repositories, add MGM and keep existing selections.
+          A successful clone of a public repository does not establish permission to receive pushes.
+        </li>
         <li>Connect the shared MGM repository to the installation's existing Worker.</li>
         <li>Select main as the production branch and disable preview deployments.</li>
         <li>
@@ -148,7 +153,9 @@
       <ul>
         <li>
           <strong>No framework build appeared:</strong> check the repository connection, main-branch
-          trigger, and whether builds are enabled for that Worker.
+          trigger, and whether builds are enabled for that Worker. If Cloudflare says the project is
+          disconnected from Git, check that the MGM repository is included in the Cloudflare GitHub
+          app's authorized repositories.
         </li>
         <li>
           <strong>Framework build failed:</strong> inspect its Cloudflare build log for the failing
