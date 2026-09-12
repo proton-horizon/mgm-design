@@ -3,6 +3,12 @@ import { ArrowLeft, ArrowRight, Hand, Minus, MousePointer2, Plus, Scan, X } from
 import type { Board } from './types';
 import { bounds, fitView, placeFrames, zoomAt, type View } from './canvas-math';
 import { useDialog } from './useDialog';
+import {
+  frameIntersectsViewport,
+  PREVIEW_MIN_SCALE,
+  PREVIEW_SETTLE_MS,
+  selectLiveFrames,
+} from './preview-budget';
 
 export default function Canvas({ board }: { board: Board }) {
   const frames = useMemo(() => placeFrames(board.frames), [board.frames]);
@@ -14,6 +20,25 @@ export default function Canvas({ board }: { board: Board }) {
   const [dragging, setDragging] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
   const [interacting, setInteracting] = useState(false);
+  const [pageVisible, setPageVisible] = useState(document.visibilityState !== 'hidden');
+  const [liveFrames, setLiveFrames] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    const changed = () => setPageVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', changed);
+    return () => document.removeEventListener('visibilitychange', changed);
+  }, []);
+  useEffect(() => {
+    if (interacting || !pageVisible || view.scale < PREVIEW_MIN_SCALE) {
+      setLiveFrames(new Set());
+      return;
+    }
+    // Camera movement must not start a stream of short-lived document loads.
+    const timer = window.setTimeout(
+      () => setLiveFrames(selectLiveFrames(frames, view, size, selected)),
+      PREVIEW_SETTLE_MS,
+    );
+    return () => window.clearTimeout(timer);
+  }, [frames, view, size, selected, interacting, pageVisible]);
   const interactionDialog = useDialog(interacting);
   const [windowSize, setWindowSize] = useState({
     width: window.innerWidth,
@@ -182,11 +207,12 @@ export default function Canvas({ board }: { board: Board }) {
           style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}
         >
           {frames.map((frame, index) => {
-            const visible =
-              (frame.x + frame.width) * view.scale + view.x > -200 &&
-              frame.x * view.scale + view.x < size.width + 200 &&
-              (frame.y + frame.height) * view.scale + view.y > -200 &&
-              frame.y * view.scale + view.y < size.height + 200;
+            const live =
+              pageVisible &&
+              !interacting &&
+              view.scale >= PREVIEW_MIN_SCALE &&
+              liveFrames.has(frame.id) &&
+              frameIntersectsViewport(frame, view, size);
             return (
               <div
                 key={frame.id}
@@ -203,7 +229,7 @@ export default function Canvas({ board }: { board: Board }) {
                     {frame.width} × {frame.height}
                   </span>
                 </div>
-                {visible && !interacting ? (
+                {live ? (
                   <iframe
                     title={frame.name}
                     src={frame.entry}
@@ -212,7 +238,10 @@ export default function Canvas({ board }: { board: Board }) {
                     tabIndex={-1}
                   />
                 ) : (
-                  <div className="frame-placeholder">{frame.name}</div>
+                  <div className="frame-placeholder">
+                    <span>{frame.name}</span>
+                    <small>Zoom in or use Jump to preview</small>
+                  </div>
                 )}
                 <div className="frame-shield" />
               </div>
@@ -224,7 +253,9 @@ export default function Canvas({ board }: { board: Board }) {
         <span className="tiny-dot" />
         {frames.length} screens
         <span className="note-divider" />
-        Drag to pan · Pinch to zoom
+        {view.scale < PREVIEW_MIN_SCALE
+          ? 'Overview · Zoom in to load screens'
+          : 'Drag to pan · Pinch to zoom'}
       </div>
       <label className="screen-jump">
         <span>Jump to</span>
@@ -362,17 +393,19 @@ export default function Canvas({ board }: { board: Board }) {
             </span>
           </div>
           <div className="interaction-stage">
-            <iframe
-              title={`Interactive ${active.name}`}
-              src={active.entry}
-              sandbox="allow-scripts"
-              referrerPolicy="no-referrer"
-              style={{
-                width: active.width,
-                height: active.height,
-                transform: `translate(-50%, -50%) scale(${Math.min((windowSize.width - 32) / active.width, (windowSize.height - 133) / active.height, 1)})`,
-              }}
-            />
+            {pageVisible && (
+              <iframe
+                title={`Interactive ${active.name}`}
+                src={active.entry}
+                sandbox="allow-scripts"
+                referrerPolicy="no-referrer"
+                style={{
+                  width: active.width,
+                  height: active.height,
+                  transform: `translate(-50%, -50%) scale(${Math.min((windowSize.width - 32) / active.width, (windowSize.height - 133) / active.height, 1)})`,
+                }}
+              />
+            )}
           </div>
           <div className="interaction-pager">
             <button

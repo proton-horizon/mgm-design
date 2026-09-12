@@ -127,6 +127,7 @@ The complete latest successful set replaces the previous one atomically. Failed 
 - [Backend and bundle contract](docs/backend.md) — exact manifest, API, limits, security, and recovery.
 - [App architecture](docs/architecture.md) — UI behavior and local development.
 - `pnpm build`, `pnpm typecheck:worker`, `pnpm test`.
+- `node scripts/check-canvas.mjs` — after building and installing Playwright Chromium/WebKit, verifies a 75-screen fixture at phone, tablet, and desktop sizes against the real local Worker. GitHub checks run this browser regression too.
 
 The build includes [third-party notices](public/third-party-notices.txt) for the viewer's installed runtime dependencies. Keep these notices with redistributed builds. Published design bundles own their asset and dependency notices separately.
 

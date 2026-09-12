@@ -588,10 +588,18 @@ h3 {
 }
 .frame-placeholder {
   height: 100%;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
+  text-align: center;
   color: #888;
   background: #fff;
+}
+.frame-placeholder small {
+  font-size: 12px;
 }
 .canvas-note {
   position: absolute;

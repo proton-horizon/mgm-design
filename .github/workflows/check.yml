@@ -19,3 +19,5 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck:worker
       - run: pnpm test
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: node scripts/check-canvas.mjs
