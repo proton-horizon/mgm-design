@@ -33,6 +33,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: .mgm-design-publisher/package.json
+      - name: Install preview capture dependencies
+        working-directory: .mgm-design-publisher
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
       - name: Publish browser-ready design bundle
         env:
           MGM_SITE_URL: ${{ vars.MGM_SITE_URL }}
@@ -44,4 +52,4 @@ jobs:
             exit 1
           fi
           export MGM_PUBLISH_SEQUENCE=$((GITHUB_RUN_NUMBER * 1000 + GITHUB_RUN_ATTEMPT))
-          node .mgm-design-publisher/scripts/publish.mjs --directory design
+          node .mgm-design-publisher/scripts/publish.mjs --directory design --previews

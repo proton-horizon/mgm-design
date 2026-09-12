@@ -380,4 +380,46 @@ describe('deployment backend', () => {
       ),
     ).toThrow('base64');
   });
+  it('accepts optional listed raster previews and rejects executable or unlisted paths', () => {
+    const withPreview = (preview: unknown) => ({
+      ...manifest,
+      files: [...manifest.files, 'preview.jpg', 'preview.svg'],
+      boards: [{ ...manifest.boards[0], frames: [{ ...manifest.boards[0].frames[0], preview }] }],
+    });
+    expect(
+      validateManifest(withPreview('preview.jpg'), 'rubber-ducky').boards[0].frames[0].preview,
+    ).toBe('preview.jpg');
+    for (const path of [
+      'missing.png',
+      'preview.svg',
+      'app/index.html',
+      '../preview.jpg',
+      'https://example.com/preview.jpg',
+      null,
+    ])
+      expect(() => validateManifest(withPreview(path), 'rubber-ducky')).toThrow('preview');
+  });
+  it('protects preview images with the same revocable grant as their frame', async () => {
+    const imageBundle = structuredClone(bundle);
+    Object.assign(imageBundle.manifest.boards[0].frames[0], { preview: 'preview.jpg' });
+    imageBundle.manifest.files.push('preview.jpg');
+    Object.assign(imageBundle.files, {
+      'preview.jpg': Buffer.from('image fixture').toString('base64'),
+    });
+    await attempt('image-preview', 100);
+    expect((await upload('image-preview', imageBundle)).status).toBe(200);
+    const { projects } = (await (
+      await request('/api/projects', { cookie: adminCookie })
+    ).json()) as any;
+    const frame = projects[0].boards[0].frames[0];
+    expect(frame.preview.split('/').slice(0, 3)).toEqual(frame.entry.split('/').slice(0, 3));
+    const response = await request(frame.preview);
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('image/jpeg');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).toBe('image fixture');
+    expect((await request('/mocks/preview.jpg')).status).not.toBe(200);
+    await request('/api/logout', { method: 'POST', origin, cookie: adminCookie, data: {} });
+    expect((await request(frame.preview)).status).toBe(401);
+  });
 });

@@ -9,6 +9,8 @@ const MAX_FRAME_PIXELS = 4_000_000;
 /** Tests intersection in CSS screen coordinates, without preloading outside the viewport. */
 export function frameIntersectsViewport(frame: PlacedFrame, view: View, size: ViewportSize) {
   return (
+    size.width > 0 &&
+    size.height > 0 &&
     (frame.x + frame.width) * view.scale + view.x > 0 &&
     frame.x * view.scale + view.x < size.width &&
     (frame.y + frame.height) * view.scale + view.y > 0 &&

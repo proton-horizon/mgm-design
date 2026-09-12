@@ -230,7 +230,15 @@ export default function Canvas({ board }: { board: Board }) {
                     {frame.width} × {frame.height}
                   </span>
                 </div>
-                {live ? (
+                {pageVisible && frame.preview && frameIntersectsViewport(frame, view, size) ? (
+                  <FramePreview key={frame.preview} src={frame.preview} name={frame.name} />
+                ) : (
+                  <div className="frame-placeholder">
+                    <span>{frame.name}</span>
+                    <small>Open this screen to explore</small>
+                  </div>
+                )}
+                {live && (
                   <iframe
                     title={frame.name}
                     src={frame.entry}
@@ -238,11 +246,6 @@ export default function Canvas({ board }: { board: Board }) {
                     referrerPolicy="no-referrer"
                     tabIndex={-1}
                   />
-                ) : (
-                  <div className="frame-placeholder">
-                    <span>{frame.name}</span>
-                    <small>Zoom in or use Jump to preview</small>
-                  </div>
                 )}
                 <div className="frame-shield" />
               </div>
@@ -255,7 +258,7 @@ export default function Canvas({ board }: { board: Board }) {
         {frames.length} screens
         <span className="note-divider" />
         {view.scale < PREVIEW_MIN_SCALE
-          ? 'Overview · Zoom in to load screens'
+          ? 'Overview · Select a screen to explore'
           : 'Drag to pan · Pinch to zoom'}
       </div>
       <label className="screen-jump">
@@ -442,5 +445,26 @@ export default function Canvas({ board }: { board: Board }) {
         </section>
       )}
     </div>
+  );
+}
+
+function FramePreview({ src, name }: { src: string; name: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed)
+    return (
+      <div className="frame-placeholder">
+        <span>{name}</span>
+        <small>Preview unavailable · Open this screen</small>
+      </div>
+    );
+  return (
+    <img
+      className="frame-preview"
+      src={src}
+      alt={`${name} preview`}
+      decoding="async"
+      referrerPolicy="no-referrer"
+      onError={() => setFailed(true)}
+    />
   );
 }

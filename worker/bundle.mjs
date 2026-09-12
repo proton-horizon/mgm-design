@@ -101,7 +101,7 @@ export function validateManifest(manifest, projectId) {
     boards.add(board.id);
     const frames = new Set();
     for (const frame of board.frames) {
-      keys(frame, ['id', 'name', 'entry', 'width', 'height', 'x', 'y'], 'frame');
+      keys(frame, ['id', 'name', 'entry', 'preview', 'width', 'height', 'x', 'y'], 'frame');
       if (
         !id(frame.id) ||
         frames.has(frame.id) ||
@@ -110,6 +110,13 @@ export function validateManifest(manifest, projectId) {
         !frame.entry.endsWith('.html')
       )
         throw new Error('Every frame needs a unique id, name, and listed HTML entry.');
+      if (
+        frame.preview !== undefined &&
+        (typeof frame.preview !== 'string' ||
+          !manifest.files.includes(frame.preview) ||
+          !/\.(png|jpg|jpeg|webp)$/.test(frame.preview))
+      )
+        throw new Error('Frame preview must be a listed PNG, JPEG, or WebP image.');
       if (![frame.width, frame.height].every((n) => Number.isInteger(n) && n >= 100 && n <= 4096))
         throw new Error('Frame dimensions must be integers from 100 to 4096.');
       if (

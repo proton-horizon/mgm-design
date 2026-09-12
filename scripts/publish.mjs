@@ -57,7 +57,12 @@ try {
   };
   // Register first so missing files and local validation failures appear on the destination site.
   ({ attemptId } = await send(base, 'POST', metadata));
-  const { manifest, files } = await readBundle(directory, project);
+  let bundle = await readBundle(directory, project);
+  if (args.includes('--previews')) {
+    const { generatePreviews } = await import('./generate-previews.mjs');
+    bundle = await generatePreviews(bundle);
+  }
+  const { manifest, files } = bundle;
   await send(`${base}/${attemptId}`, 'PUT', { manifest, files });
   console.log(
     `Published ${project}: ${manifest.boards.length} boards, ${manifest.files.length} files to ${url.origin}.`,

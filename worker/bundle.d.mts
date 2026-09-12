@@ -2,6 +2,7 @@ export interface Frame {
   id: string;
   name: string;
   entry: string;
+  preview?: string;
   width: number;
   height: number;
   x?: number;

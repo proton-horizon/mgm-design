@@ -1,8 +1,10 @@
 import { chromium, webkit, expect } from '@playwright/test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { startPreview } from './local-preview.mjs';
+import { readBundle } from './read-bundle.mjs';
+import { generatePreviews } from './generate-previews.mjs';
 
 // Real Worker/sandbox fixture; run after building with installed Playwright Chromium and WebKit.
 const directory = await mkdtemp(join(tmpdir(), 'mgm-canvas-check-'));
@@ -26,10 +28,32 @@ try {
     JSON.stringify({
       schemaVersion: 1,
       project: { id: 'canvas-check', name: 'Canvas check' },
-      boards: [{ id: 'large', name: 'Large board', frames }],
+      boards: [{ id: 'large', name: 'Large board', frames: [frames[0]] }],
       files: ['screen.html'],
     }),
   );
+  const source = await readBundle(directory);
+  const bundle = await generatePreviews(source, { onProgress() {} });
+  expect(source.manifest.boards[0].frames[0].preview).toBeUndefined();
+  const thumbnail = bundle.manifest.boards[0].frames[0].preview;
+  expect(thumbnail).toBe('mgm-previews/large/screen-0.jpg');
+  expect(await generatePreviews(bundle)).toEqual(bundle);
+  const broken = structuredClone(source);
+  broken.files['screen.html'] = Buffer.from('<script src="missing.js"></script>').toString(
+    'base64',
+  );
+  await expect(generatePreviews(broken, { onProgress() {} })).rejects.toThrow(
+    'Could not capture preview for large/screen-0',
+  );
+  expect(broken.manifest.boards[0].frames[0].preview).toBeUndefined();
+  for (const [path, content] of Object.entries(bundle.files)) {
+    await mkdir(dirname(join(directory, path)), { recursive: true });
+    await writeFile(join(directory, path), Buffer.from(content, 'base64'));
+  }
+  bundle.manifest.boards[0].frames = frames.map((frame, index) =>
+    index === 74 ? frame : { ...frame, preview: thumbnail },
+  );
+  await writeFile(join(directory, 'manifest.json'), JSON.stringify(bundle.manifest));
   preview = await startPreview({ directories: [directory], port: 0, onUpdate() {} });
   for (const engine of [chromium, webkit]) {
     const browser = await engine.launch({ headless: true });
@@ -54,7 +78,8 @@ try {
           let mockRequests = 0;
           page.on('pageerror', (error) => errors.push(error.name));
           page.on('request', (request) => {
-            if (request.url().includes('/mocks/')) mockRequests++;
+            if (request.url().includes('/mocks/') && request.resourceType() === 'document')
+              mockRequests++;
           });
           await page.goto(preview.origin);
           await expect(page.locator('[data-frame]')).toHaveCount(75);
@@ -62,6 +87,19 @@ try {
           await page.waitForTimeout(400);
           await expect(page.locator('iframe')).toHaveCount(0);
           expect(mockRequests).toBe(0);
+          await expect(page.locator('.frame-preview').first()).toBeVisible();
+          await expect
+            .poll(() =>
+              page
+                .locator('.frame-preview')
+                .evaluateAll((images) =>
+                  images.every(
+                    (image) =>
+                      image.complete && image.naturalWidth > 0 && image.naturalHeight === 640,
+                  ),
+                ),
+            )
+            .toBe(true);
           await page.evaluate(() => {
             window.maxLiveFrames = 0;
             new MutationObserver(
@@ -127,10 +165,15 @@ try {
           expect(await page.evaluate(() => window.maxLiveFrames)).toBeLessThanOrEqual(2);
           await page.getByRole('button', { name: 'Fit all screens', exact: true }).click();
           await expect(page.locator('iframe')).toHaveCount(0);
+          await page.getByLabel('Jump to screen').selectOption('screen-74');
+          await expect(page.locator('[data-frame="screen-74"] iframe')).toHaveCount(1);
+          await expect(page.locator('[data-frame="screen-74"] .frame-placeholder')).toContainText(
+            'Open this screen',
+          );
           expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
           expect(errors).toEqual([]);
           console.log(
-            `${engine.name()} ${width}px: 75 frames, zero overview loads, bounded focus/interaction, rapid navigation and sandbox passed`,
+            `${engine.name()} ${width}px: 75 frames, generated overview images with zero live documents, bounded focus/interaction, rapid navigation and sandbox passed`,
           );
         } finally {
           await context.close();

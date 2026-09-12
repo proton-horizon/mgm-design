@@ -36,11 +36,25 @@
         </li>
       </ol>
       <pre><code>MGM_SITE_URL=https://design.example.com MGM_PROJECT_ID=my-app \
-  node /path/to/mgm-design/scripts/publish.mjs</code></pre>
+  node /path/to/mgm-design/scripts/publish.mjs --previews</code></pre>
       <p>
         Supply <code>MGM_PUBLISH_TOKEN</code> through existing secret wiring. These names are
         examples for mapping configuration, not a requirement to move or rename secrets. Multiple
         destinations need separate URLs and tokens with independent outcomes.
+      </p>
+      <h2>Overview images</h2>
+      <p>
+        Use the <a href="../../examples/design-publish.yml">example GitHub Actions workflow</a> to
+        install the publisher’s dependencies and Chromium, then publish with
+        <code>--previews</code>. It makes a small screenshot of each screen, one at a time, before
+        upload. These images let phones and tablets show the whole board without running every mock.
+        Zooming in and Interact load the working HTML, including supported 3D content.
+      </p>
+      <p>
+        Images are generated in temporary storage; your <code>design/</code> source is unchanged.
+        They count toward the 300-file and 20 MiB bundle limits. If capture fails or the bundle is
+        too large, the previous publication stays visible and the workflow reports the failure.
+        Update the destination’s MGM Design installation before first publishing overview images.
       </p>
       <h2>Preview while working locally</h2>
       <p>

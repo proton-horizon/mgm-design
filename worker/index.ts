@@ -402,7 +402,11 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
         boards:
           manifest?.boards.map((board) => ({
             ...board,
-            frames: board.frames.map((frame) => ({ ...frame, entry: prefix + frame.entry })),
+            frames: board.frames.map((frame) => ({
+              ...frame,
+              entry: prefix + frame.entry,
+              ...(frame.preview ? { preview: prefix + frame.preview } : {}),
+            })),
           })) || [],
         publication: publication(latest),
         activePublication: publication(active),
