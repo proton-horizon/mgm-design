@@ -13,7 +13,8 @@ import {
 export default function Canvas({ board }: { board: Board }) {
   const frames = useMemo(() => placeFrames(board.frames), [board.frames]);
   const viewport = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 1000, height: 800 });
+  // No preview loads before the first measurement and fit, even if ResizeObserver is delayed.
+  const [size, setSize] = useState({ width: 0, height: 0 });
   const [view, setView] = useState<View>({ x: 70, y: 100, scale: 0.7 });
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const dragged = useRef(false);

@@ -42,6 +42,14 @@ try {
         });
         try {
           const page = await context.newPage();
+          await page.addInitScript(() => {
+            const NativeResizeObserver = window.ResizeObserver;
+            window.ResizeObserver = class extends NativeResizeObserver {
+              constructor(callback) {
+                super((entries, observer) => setTimeout(() => callback(entries, observer), 350));
+              }
+            };
+          });
           const errors = [];
           let mockRequests = 0;
           page.on('pageerror', (error) => errors.push(error.name));
@@ -50,6 +58,7 @@ try {
           });
           await page.goto(preview.origin);
           await expect(page.locator('[data-frame]')).toHaveCount(75);
+          await expect(page.locator('.zoom-value')).toHaveText('8%');
           await page.waitForTimeout(400);
           await expect(page.locator('iframe')).toHaveCount(0);
           expect(mockRequests).toBe(0);
