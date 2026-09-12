@@ -114,8 +114,24 @@ try {
             });
           });
           await page.getByLabel('Jump to screen').selectOption('screen-0');
-          await expect(page.locator('[data-frame="screen-0"] iframe')).toHaveCount(1);
-          expect(await page.locator('iframe').count()).toBeLessThanOrEqual(2);
+          await expect(page.locator('[data-frame="screen-0"] .frame-preview')).toBeVisible();
+          await page.locator('.canvas').press('1');
+          await expect(page.locator('.zoom-value')).toHaveText('100%');
+          const canvas = await page.locator('.canvas').boundingBox();
+          await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+          for (const delta of [80, -80, 120, -120]) {
+            await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+            await page.mouse.down();
+            await page.mouse.move(
+              canvas.x + canvas.width / 2 + delta,
+              canvas.y + canvas.height / 2,
+              { steps: 6 },
+            );
+            await page.mouse.up();
+            await page.waitForTimeout(400);
+            await expect(page.locator('iframe')).toHaveCount(0);
+          }
+          expect(mockRequests).toBe(0);
           await page.getByRole('button', { name: 'Interact', exact: true }).click();
           await expect(page.locator('iframe')).toHaveCount(1);
           const iframe = page.locator('.interaction-stage iframe');
@@ -160,20 +176,27 @@ try {
               await new Promise((resolve) => setTimeout(resolve, 16));
             }
           });
-          await expect(page.locator('[data-frame="screen-19"] iframe')).toHaveCount(1);
-          expect(mockRequests - before).toBeLessThanOrEqual(2);
-          expect(await page.evaluate(() => window.maxLiveFrames)).toBeLessThanOrEqual(2);
+          await page.waitForTimeout(400);
+          await expect(page.locator('[data-frame="screen-19"] .frame-preview')).toBeVisible();
+          await expect(page.locator('iframe')).toHaveCount(0);
+          expect(mockRequests).toBe(before);
+          expect(await page.evaluate(() => window.maxLiveFrames)).toBe(1);
           await page.getByRole('button', { name: 'Fit all screens', exact: true }).click();
           await expect(page.locator('iframe')).toHaveCount(0);
           await page.getByLabel('Jump to screen').selectOption('screen-74');
-          await expect(page.locator('[data-frame="screen-74"] iframe')).toHaveCount(1);
+          await expect(page.locator('iframe')).toHaveCount(0);
           await expect(page.locator('[data-frame="screen-74"] .frame-placeholder')).toContainText(
             'Open this screen',
           );
+          await page.getByRole('button', { name: 'Interact', exact: true }).click();
+          await expect(page.frameLocator('.interaction-stage iframe').locator('button')).toHaveText(
+            '0',
+          );
+          await expect(page.locator('iframe')).toHaveCount(1);
           expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(width);
           expect(errors).toEqual([]);
           console.log(
-            `${engine.name()} ${width}px: 75 frames, generated overview images with zero live documents, bounded focus/interaction, rapid navigation and sandbox passed`,
+            `${engine.name()} ${width}px: 75 frames, static pan/zoom with zero document requests, one live Interact screen, old-bundle interaction and sandbox passed`,
           );
         } finally {
           await context.close();
