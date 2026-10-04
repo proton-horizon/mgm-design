@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Miniflare } from 'miniflare';
 import { build } from 'esbuild';
-import { readFile } from 'node:fs/promises';
+import { applyMigrations } from '../../scripts/local-preview.mjs';
 
 const origin = 'https://publication.example.com';
 let mf: Miniflare;
@@ -149,14 +149,7 @@ beforeAll(async () => {
     ],
   });
   const db = await mf.getD1Database('DB');
-  const migration = await readFile('migrations/0001_initial.sql', 'utf8');
-  await db.batch(
-    migration
-      .split(';')
-      .map((sql) => sql.trim())
-      .filter(Boolean)
-      .map((sql) => db.prepare(sql)),
-  );
+  await applyMigrations(db);
   const setup = await request('/api/setup', 'POST', {
     email: 'owner@example.com',
     name: 'Owner',

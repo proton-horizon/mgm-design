@@ -22,11 +22,23 @@ export default function Admin({
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState('');
   const [copied, setCopied] = useState(false);
-  const [reset, setReset] = useState<User | null>(null);
+  const [invites, setInvites] = useState<(User & { expiresAt: number })[]>([]);
+  const [link, setLink] = useState<{
+    url: string;
+    email: string;
+    expiresAt: string;
+    kind: string;
+  } | null>(null);
+  async function createLink(path: string, data = {}) {
+    setLink(await request(path, { method: 'POST', body: JSON.stringify(data) }));
+    setCopied(false);
+  }
   async function loadUsers() {
     try {
       const data = await request<{ users: User[] }>('/api/admin/users');
       setUsers(data.users);
+      const pending = await request<{ invites: typeof invites }>('/api/admin/invites');
+      setInvites(pending.invites);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -111,6 +123,35 @@ export default function Admin({
                 setCopied(false);
               }}
             >
+              Done
+            </button>
+          </div>
+        )}
+        {link && tab === 'people' && (
+          <div className="token-box" role="status">
+            <strong>
+              {link.kind === 'invite' ? 'Invitation' : 'Password-reset link'} for {link.email}
+            </strong>
+            <p>
+              Share privately with this person. Anyone with this link can set their password.
+              Expires {new Date(link.expiresAt).toLocaleString()}.
+            </p>
+            <code>{link.url}</code>
+            <button
+              className="plain-button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(link.url);
+                  setCopied(true);
+                } catch {
+                  setError('Could not copy. Select and copy the link manually.');
+                }
+              }}
+            >
+              {copied ? <Check size={15} /> : <Copy size={15} />}
+              {copied ? 'Copied' : 'Copy link'}
+            </button>
+            <button className="plain-button" onClick={() => setLink(null)}>
               Done
             </button>
           </div>
@@ -200,12 +241,38 @@ export default function Admin({
                       {user.id === currentUser.id ? ' (you)' : ''}
                     </strong>
                     <small>
-                      {user.email} · {user.disabled ? 'Disabled' : user.role}
+                      {user.email} ·{' '}
+                      {user.disabled ? 'Disabled' : user.role === 'admin' ? 'Site admin' : 'Viewer'}
                     </small>
                   </div>
                   <div className="row-actions">
-                    <button className="plain-button" onClick={() => setReset(user)}>
-                      Reset password
+                    <select
+                      aria-label={`Role for ${user.email}`}
+                      value={user.role}
+                      disabled={busy || user.id === currentUser.id}
+                      onChange={(event) => {
+                        const role = event.target.value;
+                        void action(async () => {
+                          await request(`/api/admin/users/${user.id}`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ role }),
+                          });
+                          setLink(null);
+                          await loadUsers();
+                        });
+                      }}
+                    >
+                      <option value="viewer">Viewer</option>
+                      <option value="admin">Site admin</option>
+                    </select>
+                    <button
+                      className="plain-button"
+                      disabled={busy || !!user.disabled}
+                      onClick={() =>
+                        void action(() => createLink(`/api/admin/users/${user.id}/reset-link`))
+                      }
+                    >
+                      Create reset link
                     </button>
                     {user.id !== currentUser.id && (
                       <button
@@ -217,6 +284,7 @@ export default function Admin({
                               method: 'PATCH',
                               body: JSON.stringify({ disabled: !user.disabled }),
                             });
+                            setLink(null);
                             await loadUsers();
                           })
                         }
@@ -228,95 +296,75 @@ export default function Admin({
                 </div>
               ))}
             </div>
-            {reset ? (
-              <form
-                className="admin-form"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  const password = new FormData(e.currentTarget).get('password');
-                  void action(async () => {
-                    await request(`/api/admin/users/${reset.id}`, {
-                      method: 'PATCH',
-                      body: JSON.stringify({ password }),
-                    });
-                    setReset(null);
-                    if (reset.id === currentUser.id) location.reload();
-                  });
-                }}
-              >
-                <h3>Reset password for {reset.name}</h3>
-                <label>
-                  New password
-                  <input
-                    name="password"
-                    type="password"
-                    minLength={12}
-                    required
-                    autoComplete="new-password"
-                  />
-                </label>
-                <p className="hint">
-                  Share the new password directly. Existing sessions will be signed out.
-                </p>
-                <button className="primary-button" disabled={busy}>
-                  Save password
-                </button>
-                <button type="button" className="plain-button" onClick={() => setReset(null)}>
-                  Cancel
-                </button>
-              </form>
-            ) : (
+            {invites.length > 0 && (
               <>
-                <h3>Add a person</h3>
-                <form
-                  className="admin-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    const form = e.currentTarget;
-                    const data = new FormData(form);
-                    void action(async () => {
-                      await request('/api/admin/users', {
-                        method: 'POST',
-                        body: JSON.stringify(Object.fromEntries(data)),
-                      });
-                      form.reset();
-                      await loadUsers();
-                    });
-                  }}
-                >
-                  <label>
-                    Name
-                    <input name="name" required autoComplete="off" />
-                  </label>
-                  <label>
-                    Email
-                    <input name="email" type="email" required autoComplete="off" />
-                  </label>
-                  <label>
-                    Password
-                    <input
-                      name="password"
-                      type="password"
-                      minLength={12}
-                      required
-                      placeholder="At least 12 characters"
-                      autoComplete="new-password"
-                    />
-                  </label>
-                  <label>
-                    Role
-                    <select name="role">
-                      <option value="viewer">Viewer</option>
-                      <option value="admin">Site admin</option>
-                    </select>
-                  </label>
-                  <button className="primary-button" disabled={busy}>
-                    <Plus size={16} />
-                    Add person
-                  </button>
-                </form>
+                <h3>Pending invitations</h3>
+                <div className="admin-list">
+                  {invites.map((invite) => (
+                    <div className="admin-row" key={invite.id}>
+                      <div>
+                        <strong>{invite.name}</strong>
+                        <small>
+                          {invite.email} · {invite.role === 'admin' ? 'Site admin' : 'Viewer'} ·
+                          Expires {new Date(invite.expiresAt).toLocaleDateString()}
+                        </small>
+                      </div>
+                      <button
+                        className="plain-button"
+                        disabled={busy}
+                        onClick={() =>
+                          void action(async () => {
+                            await request(`/api/admin/invites/${invite.id}`, { method: 'DELETE' });
+                            setLink(null);
+                            await loadUsers();
+                          })
+                        }
+                      >
+                        Revoke invite
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </>
             )}
+            <h3>Invite a person</h3>
+            <p className="hint">
+              They choose their own password. Create another invite for the same email to replace
+              the link or change the pending role.
+            </p>
+            <form
+              className="admin-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const data = Object.fromEntries(new FormData(form));
+                void action(async () => {
+                  await createLink('/api/admin/invites', data);
+                  form.reset();
+                  await loadUsers();
+                });
+              }}
+            >
+              <label>
+                Name
+                <input name="name" required maxLength={100} autoComplete="off" />
+              </label>
+              <label>
+                Email
+                <input name="email" type="email" required maxLength={254} autoComplete="off" />
+              </label>
+              <label>
+                Role
+                <select name="role" aria-label="Role">
+                  <option value="viewer">Viewer</option>
+                  <option value="admin">Site admin</option>
+                </select>
+              </label>
+              <button className="primary-button" disabled={busy}>
+                <Plus size={16} />
+                Create invite
+              </button>
+            </form>
           </>
         )}
       </section>

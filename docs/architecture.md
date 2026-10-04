@@ -1,6 +1,6 @@
 # App and canvas
 
-MGM Design is a React/TypeScript web app built with Vite. `src/App.tsx` owns sign-in, project navigation, appearance, and board selection. `src/Admin.tsx` manages people and project tokens. `src/Canvas.tsx` displays browser-ready frames in isolated iframes. `src/api.ts` implements the `DesignService` boundary in `src/types.ts`; hosting credentials and storage bindings never enter frontend code.
+MGM Design is a React/TypeScript web app built with Vite. `src/App.tsx` owns sign-in, project navigation, appearance, and board selection. `src/Admin.tsx` manages invitations, people, and project tokens. `src/AccountAccess.tsx` shares password-entry behavior between invite acceptance, reset links, and signed-in password changes. `src/Canvas.tsx` displays browser-ready frames in isolated iframes. `src/api.ts` implements the `DesignService` boundary in `src/types.ts`; hosting credentials and storage bindings never enter frontend code.
 
 The Worker serves built assets, checks accounts, and delivers private mocks. See [the backend contract](backend.md) for API and publication details. Source code has no built-in customer projects. The project list comes from the installation API.
 

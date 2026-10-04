@@ -11,8 +11,8 @@
     <main>
       <h1>A small, private workspace.</h1>
       <p>
-        Accounts use email and password. A site admin creates accounts and shares credentials
-        directly. There are no invitation or password-reset emails.
+        Accounts use email and password. A site admin shares an invitation link so each person
+        chooses their own password. Links are shared manually; the site does not send email.
       </p>
       <h2>First-time setup</h2>
       <p>
@@ -20,12 +20,57 @@
         for that key, an email, name, and a password of at least 12 characters. Successful setup
         permanently closes this route and signs in the first site admin.
       </p>
-      <h2>People</h2>
+      <h2>Invite someone</h2>
+      <ol>
+        <li>Open <strong>Site administration → People</strong>.</li>
+        <li>
+          Enter their name and email, choose <strong>Viewer</strong> or <strong>Site admin</strong>,
+          and select <strong>Create invite</strong>.
+        </li>
+        <li>
+          Copy the link and share it privately with that person. It works once and expires after
+          seven days.
+        </li>
+        <li>
+          They open the link, choose and confirm a password of 12–256 characters, then sign in.
+        </li>
+      </ol>
       <p>
-        Open Site administration → People to add viewers or site admins. Everyone can browse all
-        projects on that installation. Admins also manage people, register projects, and replace
-        publishing tokens. Reset a password and share it directly, or disable an account to remove
-        access. Account changes invalidate its existing sessions.
+        Pending invitations appear under People. Revoke an invite there, or create another for the
+        same email to replace its link or change its role. Links are only shown when created. If a
+        recipient refreshes the password page before saving, they can reopen the original link.
+      </p>
+      <h2>Permissions</h2>
+      <p>
+        Viewers can browse and interact with every project on this site. Site admins can also invite
+        people, change roles, disable accounts, register projects, and replace publishing tokens.
+        Use the role selector beside an existing account to switch between Viewer and Site admin.
+        You cannot disable or demote yourself; an enabled site admin must remain. Account edits sign
+        that person out. Disabling or demoting an admin also revokes links they issued.
+      </p>
+      <h2>Change your password</h2>
+      <p>
+        Open <strong>Change password</strong> in the sidebar. Enter your current password, then
+        enter and confirm your new one. On mobile, open the top-left menu to find it. Every account
+        has this option.
+      </p>
+      <h2>Forgotten passwords</h2>
+      <p>
+        Ask a site admin for a reset link. In <strong>Site administration → People</strong>, the
+        admin selects <strong>Create reset link</strong> beside an enabled account, then copies and
+        shares it privately. The recipient chooses their own password. The link works once, expires
+        after one hour, and replaces any previous reset link. Existing accounts use this flow rather
+        than a new invite.
+      </p>
+      <p>
+        Creating a reset link leaves the current password working until it is used. After a password
+        change or reset, all of that account’s sessions and remaining reset links stop working; sign
+        in again with the new password.
+      </p>
+      <p>
+        <strong>Treat links like passwords.</strong> Anyone holding one can set the intended
+        account’s password. Share only with the intended person. Invalid, used, revoked, or expired
+        links require a fresh link from a site admin.
       </p>
       <h2>Projects and tokens</h2>
       <p>

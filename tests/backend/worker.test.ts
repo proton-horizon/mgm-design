@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Miniflare } from 'miniflare';
 import { build } from 'esbuild';
-import { readFile } from 'node:fs/promises';
+import { applyMigrations } from '../../scripts/local-preview.mjs';
 import { decodeBundle, validateManifest } from '../../worker/bundle.mjs';
 
 const origin = 'https://design.example.com';
@@ -103,14 +103,7 @@ beforeAll(async () => {
     ],
   });
   const db = await mf.getD1Database('DB');
-  const migration = await readFile('migrations/0001_initial.sql', 'utf8');
-  await db.batch(
-    migration
-      .split(';')
-      .map((sql) => sql.trim())
-      .filter(Boolean)
-      .map((sql) => db.prepare(sql)),
-  );
+  await applyMigrations(db);
 }, 30000);
 afterAll(async () => {
   await mf?.dispose();
@@ -162,16 +155,25 @@ describe('deployment backend', () => {
         })
       ).status,
     ).toBe(403);
+    const invitation = await admin('/api/admin/invites', 'POST', {
+      email: 'viewer@example.com',
+      name: 'Viewer',
+      role: 'viewer',
+    });
+    expect(invitation.status).toBe(201);
+    const { url } = (await invitation.json()) as any;
     expect(
       (
-        await admin('/api/admin/users', 'POST', {
-          email: 'viewer@example.com',
-          name: 'Viewer',
-          password: 'viewer-long-password',
-          role: 'viewer',
+        await request('/api/account-link/accept', {
+          method: 'POST',
+          origin,
+          data: {
+            token: new URL(url).hash.slice('#account='.length),
+            password: 'viewer-long-password',
+          },
         })
       ).status,
-    ).toBe(201);
+    ).toBe(200);
     const login = await request('/api/login', {
       method: 'POST',
       origin,

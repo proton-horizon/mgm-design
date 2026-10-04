@@ -910,7 +910,8 @@ h3 {
   gap: 20px;
 }
 .signin-card label,
-.admin-form label {
+.admin-form label,
+.password-form label {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -919,6 +920,7 @@ h3 {
 }
 .signin-card input,
 .admin-form input,
+.password-form input,
 .admin-form select {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -1246,6 +1248,7 @@ h3 {
   }
   .signin-card input,
   .admin-form input,
+  .password-form input,
   .admin-form select {
     font-size: 16px;
   }
@@ -1365,4 +1368,15 @@ h3 {
   .interaction-header > span {
     max-width: 180px;
   }
+}
+
+.password-modal {
+  max-width: 460px;
+}
+.password-modal form {
+  display: grid;
+  gap: 16px;
+}
+.row-actions select {
+  max-width: 140px;
 }

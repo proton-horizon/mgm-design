@@ -285,6 +285,34 @@ function publication(attempt: Attempt | null) {
   };
 }
 
+interface AccountLink {
+  id: string;
+  kind: 'invite' | 'reset';
+  email: string;
+  name: string;
+  role: 'admin' | 'viewer';
+  user_id: string | null;
+  expires_at: number;
+}
+// Used again inside the redemption transaction, after password hashing has finished.
+const usableLink = `claim IS NULL AND expires_at>? AND EXISTS (
+  SELECT 1 FROM users issuer WHERE issuer.id=account_links.issued_by AND issuer.disabled=0 AND issuer.role='admin'
+) AND ((kind='invite' AND NOT EXISTS(SELECT 1 FROM users WHERE email=account_links.email))
+  OR (kind='reset' AND EXISTS(SELECT 1 FROM users WHERE id=account_links.user_id AND disabled=0)))`;
+function accountRole(value: unknown): 'admin' | 'viewer' {
+  if (value !== 'admin' && value !== 'viewer')
+    throw new HttpError(400, 'Choose Viewer or Site admin.');
+  return value;
+}
+function linkHash(input: unknown) {
+  if (typeof input !== 'string' || !/^[a-f0-9]{64}$/.test(input))
+    throw new HttpError(
+      410,
+      'This link is invalid or has expired. Ask a site admin for a new link.',
+    );
+  return hash(input);
+}
+
 async function api(request: Request, env: Env, db: Store, url: URL): Promise<Response> {
   const path = url.pathname;
   const method = request.method;
@@ -370,6 +398,93 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
     if (current) await db.run('DELETE FROM sessions WHERE hash=?', current.hash);
     return json({ ok: true }, 200, { 'Set-Cookie': cookie(request, '', true) });
   }
+  if ((path === '/api/account-link' || path === '/api/account-link/accept') && method === 'POST') {
+    sameOrigin(request);
+    await throttle(request, db, 'account-link', 30);
+    const input = await body(request);
+    const digest = await linkHash(input.token);
+    const link = await db.one<AccountLink>(
+      `SELECT * FROM account_links WHERE hash=? AND ${usableLink}`,
+      digest,
+      now(),
+    );
+    if (!link)
+      throw new HttpError(
+        410,
+        'This link is invalid or has expired. Ask a site admin for a new link.',
+      );
+    if (path === '/api/account-link')
+      return json({
+        kind: link.kind,
+        email: link.email,
+        name: link.name,
+        role: link.role,
+        expiresAt: new Date(link.expires_at).toISOString(),
+      });
+    const passwordHash = await passwordHasher.hash(password(input.password));
+    const claim = crypto.randomUUID();
+    const userId = link.user_id || crypto.randomUUID();
+    const results = await db.batch([
+      ['UPDATE account_links SET claim=? WHERE hash=? AND ' + usableLink, [claim, digest, now()]],
+      [
+        "INSERT INTO users(id,email,name,role,password_hash,created_at) SELECT ?,email,name,role,?,? FROM account_links WHERE hash=? AND claim=? AND kind='invite'",
+        [userId, passwordHash, iso(), digest, claim],
+      ],
+      [
+        "UPDATE users SET password_hash=? WHERE id=? AND EXISTS(SELECT 1 FROM account_links WHERE hash=? AND claim=? AND kind='reset')",
+        [passwordHash, userId, digest, claim],
+      ],
+      [
+        'DELETE FROM sessions WHERE user_id=? AND EXISTS(SELECT 1 FROM account_links WHERE hash=? AND claim=?)',
+        [userId, digest, claim],
+      ],
+      [
+        'DELETE FROM account_links WHERE (user_id=? OR email=?) AND hash!=? AND EXISTS(SELECT 1 FROM account_links accepted WHERE accepted.hash=? AND accepted.claim=?)',
+        [userId, link.email, digest, digest, claim],
+      ],
+    ]);
+    if (!results[0].changes)
+      throw new HttpError(
+        410,
+        'This link is invalid or has expired. Ask a site admin for a new link.',
+      );
+    return json({ ok: true }, 200, { 'Set-Cookie': cookie(request, '', true) });
+  }
+  if (path === '/api/account/password' && method === 'POST') {
+    sameOrigin(request);
+    const current = await requireSession(request, db);
+    await throttle(request, db, `password:${current.user.id}`, 10);
+    const input = await body(request);
+    const candidate =
+      typeof input.currentPassword === 'string' && input.currentPassword.length <= 256
+        ? input.currentPassword
+        : '';
+    try {
+      if (!(await passwordHasher.verify(candidate, current.user.password_hash)).valid)
+        throw new HttpError(400, 'Your current password is incorrect.');
+    } catch (error) {
+      if (error instanceof PasswordCompatibilityError)
+        throw new HttpError(400, 'Ask a site admin for a password-reset link.');
+      throw error;
+    }
+    const digest = await passwordHasher.hash(password(input.password));
+    const results = await db.batch([
+      [
+        'UPDATE users SET password_hash=? WHERE id=? AND password_hash=? AND disabled=0 AND EXISTS(SELECT 1 FROM sessions WHERE hash=? AND expires_at>?)',
+        [digest, current.user.id, current.user.password_hash, current.hash, now()],
+      ],
+      [
+        'DELETE FROM account_links WHERE user_id=? AND EXISTS(SELECT 1 FROM users WHERE id=? AND password_hash=?)',
+        [current.user.id, current.user.id, digest],
+      ],
+      [
+        'DELETE FROM sessions WHERE user_id=? AND EXISTS(SELECT 1 FROM users WHERE id=? AND password_hash=?)',
+        [current.user.id, current.user.id, digest],
+      ],
+    ]);
+    if (!results[0].changes) throw new HttpError(409, 'Account changed. Please sign in again.');
+    return json({ ok: true }, 200, { 'Set-Cookie': cookie(request, '', true) });
+  }
   if (path === '/api/projects' && method === 'GET') {
     const current = await requireSession(request, db);
     const projects = await db.all<Project>('SELECT * FROM projects ORDER BY created_at,id');
@@ -424,25 +539,85 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
           'SELECT id,email,name,role,disabled,created_at AS createdAt FROM users ORDER BY created_at',
         ),
       });
-    if (path === '/api/admin/users' && method === 'POST') {
+    if (path === '/api/admin/invites' && method === 'GET')
+      return json({
+        invites: await db.all(
+          `SELECT id,email,name,role,expires_at AS expiresAt FROM account_links WHERE kind='invite' AND ${usableLink} ORDER BY expires_at DESC`,
+          now(),
+        ),
+      });
+    if (path === '/api/admin/invites' && method === 'POST') {
       const input = await body(request);
-      const id = crypto.randomUUID();
       const userEmail = email(input.email);
       const name = requireText(input.name, 'name');
-      const role = input.role === 'admin' ? 'admin' : 'viewer';
-      const digest = await passwordHasher.hash(password(input.password));
+      const role = accountRole(input.role);
       if (await db.one('SELECT id FROM users WHERE email=?', userEmail))
+        throw new HttpError(
+          409,
+          'An account with this email already exists. Use a password-reset link instead.',
+        );
+      const token = random();
+      const expiresAt = now() + 7 * 86400000;
+      const result = await db.batch([
+        ["DELETE FROM account_links WHERE email=? AND kind='invite'", [userEmail]],
+        [
+          "INSERT INTO account_links(id,hash,kind,email,name,role,issued_by,expires_at) SELECT ?,?,'invite',?,?,?,?,? WHERE NOT EXISTS(SELECT 1 FROM users WHERE email=?)",
+          [
+            crypto.randomUUID(),
+            await hash(token),
+            userEmail,
+            name,
+            role,
+            current.user.id,
+            expiresAt,
+            userEmail,
+          ],
+        ],
+      ]);
+      if (!result[1].changes)
         throw new HttpError(409, 'An account with this email already exists.');
-      await db.run(
-        'INSERT INTO users(id,email,name,role,password_hash,created_at) VALUES(?,?,?,?,?,?)',
-        id,
-        userEmail,
-        name,
-        role,
-        digest,
-        iso(),
+      return json(
+        {
+          url: `${url.origin}/#account=${token}`,
+          expiresAt: new Date(expiresAt).toISOString(),
+          email: userEmail,
+          kind: 'invite',
+        },
+        201,
       );
-      return json({ user: { id, email: userEmail, name, role, disabled: 0 } }, 201);
+    }
+    const inviteMatch = path.match(/^\/api\/admin\/invites\/([^/]+)$/);
+    if (inviteMatch && method === 'DELETE') {
+      await db.run("DELETE FROM account_links WHERE id=? AND kind='invite'", inviteMatch[1]);
+      return json({ ok: true });
+    }
+    const resetMatch = path.match(/^\/api\/admin\/users\/([^/]+)\/reset-link$/);
+    if (resetMatch && method === 'POST') {
+      await throttle(request, db, `reset-link:${current.user.id}`, 30);
+      const target = await db.one<User>(
+        'SELECT * FROM users WHERE id=? AND disabled=0',
+        resetMatch[1],
+      );
+      if (!target) throw new HttpError(404, 'Enabled account not found.');
+      const token = random();
+      const expiresAt = now() + 3600000;
+      const results = await db.batch([
+        ['DELETE FROM account_links WHERE user_id=?', [target.id]],
+        [
+          "INSERT INTO account_links(id,hash,kind,email,name,role,user_id,issued_by,expires_at) SELECT ?,?,'reset',email,name,role,id,?,? FROM users WHERE id=? AND disabled=0",
+          [crypto.randomUUID(), await hash(token), current.user.id, expiresAt, target.id],
+        ],
+      ]);
+      if (!results[1].changes) throw new HttpError(409, 'Account changed. Refresh and try again.');
+      return json(
+        {
+          url: `${url.origin}/#account=${token}`,
+          expiresAt: new Date(expiresAt).toISOString(),
+          email: target.email,
+          kind: 'reset',
+        },
+        201,
+      );
     }
     const userMatch = path.match(/^\/api\/admin\/users\/([^/]+)$/);
     if (userMatch && method === 'PATCH') {
@@ -458,19 +633,36 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
       if (target.id === current.user.id && (disabled || role !== 'admin'))
         throw new HttpError(400, 'You cannot disable or demote your own admin account.');
       const name = input.name === undefined ? target.name : requireText(input.name, 'name');
-      const digest =
-        input.password === undefined
-          ? target.password_hash
-          : await passwordHasher.hash(password(input.password));
+      if (input.password !== undefined) throw new HttpError(400, 'Use a password-reset link.');
       const results = await db.batch([
         [
-          "UPDATE users SET name=?,role=?,disabled=?,password_hash=? WHERE id=? AND ((?='admin' AND ?=0) OR role!='admin' OR disabled=1 OR (SELECT COUNT(*) FROM users WHERE role='admin' AND disabled=0)>1)",
-          [name, role, disabled, digest, target.id, role, disabled],
+          "UPDATE users SET name=?,role=?,disabled=? WHERE id=? AND name=? AND role=? AND disabled=? AND ((?='admin' AND ?=0) OR role!='admin' OR disabled=1 OR (SELECT COUNT(*) FROM users WHERE role='admin' AND disabled=0)>1)",
+          [
+            name,
+            role,
+            disabled,
+            target.id,
+            target.name,
+            target.role,
+            target.disabled,
+            role,
+            disabled,
+          ],
         ],
-        ['DELETE FROM sessions WHERE user_id=?', [target.id]],
+        [
+          'DELETE FROM sessions WHERE user_id=? AND EXISTS(SELECT 1 FROM users WHERE id=? AND name=? AND role=? AND disabled=?)',
+          [target.id, target.id, name, role, disabled],
+        ],
+        [
+          "DELETE FROM account_links WHERE (user_id=? OR (issued_by=? AND (?!='admin' OR ?=1))) AND EXISTS(SELECT 1 FROM users WHERE id=? AND name=? AND role=? AND disabled=?)",
+          [target.id, target.id, role, disabled, target.id, name, role, disabled],
+        ],
       ]);
       if (!results[0].changes)
-        throw new HttpError(409, 'At least one enabled site admin must remain.');
+        throw new HttpError(
+          409,
+          'Account changed or this is the last enabled site admin. Refresh and try again.',
+        );
       return json({ ok: true });
     }
     if (path === '/api/admin/projects' && method === 'POST') {
@@ -690,6 +882,7 @@ export default {
     const time = now();
     await db.run('DELETE FROM grants WHERE expires_at<?', time);
     await db.run('DELETE FROM sessions WHERE expires_at<?', time);
+    await db.run('DELETE FROM account_links WHERE expires_at<?', time);
     await db.run('DELETE FROM login_limits WHERE reset_at<?', time);
     // Keep old immutable snapshots for a day, beyond every preview grant's one-hour lifetime.
     const obsolete = await db.all<{ id: string; project_id: string }>(

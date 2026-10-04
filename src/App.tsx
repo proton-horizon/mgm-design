@@ -24,6 +24,7 @@ import { request, service } from './api';
 import type { Project, Session } from './types';
 import Canvas from './Canvas';
 import Admin from './Admin';
+import { AccountAccess, ChangePassword } from './AccountAccess';
 
 function Mark({ small = false }: { small?: boolean }) {
   return (
@@ -38,7 +39,9 @@ function initialSelection() {
   return new URLSearchParams(location.hash.slice(1)).get('board') ?? '';
 }
 
-export default function App() {
+export default function App({ initialAccountToken = '' }: { initialAccountToken?: string }) {
+  const [accountToken, setAccountToken] = useState(initialAccountToken);
+  const [passwordSettings, setPasswordSettings] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,8 +74,8 @@ export default function App() {
     }
   }
   useEffect(() => {
-    void load();
-  }, []);
+    if (!initialAccountToken) void load();
+  }, [initialAccountToken]);
   useEffect(() => {
     const expired = () => {
       setSession((previous) => (previous ? { ...previous, user: null } : previous));
@@ -82,7 +85,13 @@ export default function App() {
     return () => window.removeEventListener('mgm-session-expired', expired);
   }, []);
   useEffect(() => {
-    const change = () => setSelection(initialSelection());
+    const change = () => {
+      const token = new URLSearchParams(location.hash.slice(1)).get('account');
+      if (token) {
+        history.replaceState(null, '', location.pathname + location.search);
+        setAccountToken(token);
+      } else setSelection(initialSelection());
+    };
     window.addEventListener('hashchange', change);
     return () => window.removeEventListener('hashchange', change);
   }, []);
@@ -137,6 +146,17 @@ export default function App() {
       setRefreshing(false);
     }
   }
+  if (accountToken)
+    return (
+      <AccountAccess
+        key={accountToken}
+        token={accountToken}
+        done={() => {
+          setAccountToken('');
+          void load();
+        }}
+      />
+    );
   if (loading)
     return (
       <div className="boot">
@@ -161,6 +181,16 @@ export default function App() {
   const failed = publication?.status === 'failed' || publication?.status === 'unknown';
   return (
     <div className={`workspace ${sidebar ? '' : 'sidebar-collapsed'}`}>
+      {passwordSettings && (
+        <ChangePassword
+          close={() => setPasswordSettings(false)}
+          onSuccess={() => {
+            setPasswordSettings(false);
+            setProjects([]);
+            void load();
+          }}
+        />
+      )}
       {mobileNav && (
         <button
           className="nav-backdrop"
@@ -288,6 +318,9 @@ export default function App() {
               <Settings2 size={16} /> Site administration
             </button>
           )}
+          <button className="sidebar-link" onClick={() => setPasswordSettings(true)}>
+            <Settings2 size={16} /> Change password
+          </button>
           <div className="account">
             <span className="account-avatar">
               {session.user.name?.slice(0, 1) || session.user.email[0]}
@@ -609,7 +642,7 @@ function SignIn({ session, onSuccess }: { session: Session; onSuccess: () => Pro
         <p className="signin-note">
           {session.setupRequired
             ? 'You’ll manage projects and access from site administration.'
-            : 'Need access? Ask your site administrator.'}
+            : 'Need access or forgot your password? Ask a site admin for a link.'}
         </p>
       </main>
       <footer>A place for everything you’re designing.</footer>

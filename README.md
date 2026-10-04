@@ -27,7 +27,7 @@ pnpm exec wrangler d1 migrations apply DB --local
 pnpm dev:site
 ```
 
-Open the printed localhost URL. Create the first admin using your local setup key, email, and a password of at least 12 characters. Add a project in Site administration, copy its publishing token once, and publish a bundle from its app repository. There are no default accounts. Rebuild the frontend after edits with `pnpm build`; Wrangler notices the changed assets.
+Open the printed localhost URL. Create the first admin using your local setup key, email, and a password of at least 12 characters. Add a project in Site administration, copy its publishing token once, and publish a bundle from its app repository. There are no default accounts. Invite people from Site administration → People, choose Viewer or Site admin, and share the one-time link privately. They choose their own password. Everyone can change their password from the sidebar; admins can create reset links. See the [access guide](website/features/access.html). Rebuild the frontend after edits with `pnpm build`; Wrangler notices the changed assets.
 
 ## Install on Cloudflare
 
