@@ -52,6 +52,11 @@ export function createConfig(env, outputPath = resolve(root, configFile)) {
     );
   }
   const workersDev = site.hostname.endsWith('.workers.dev');
+  const ingress = env.MGM_INGRESS_MODE?.trim() || 'public';
+  if (!['public', 'service-binding'].includes(ingress))
+    throw new Error('MGM_INGRESS_MODE must be public or service-binding');
+  if (ingress === 'service-binding' && workersDev)
+    throw new Error('Service-binding ingress requires a gateway URL, not workers.dev');
   if (
     workersDev &&
     (site.hostname.split('.').length !== 4 || !site.hostname.startsWith(`${name}.`))
@@ -61,6 +66,17 @@ export function createConfig(env, outputPath = resolve(root, configFile)) {
   const sourceCommit = env.WORKERS_CI_COMMIT_SHA?.trim();
   if (sourceCommit && !/^[a-f0-9]{40,64}$/i.test(sourceCommit))
     throw new Error('Invalid WORKERS_CI_COMMIT_SHA');
+  const compatibilityDate = env.MGM_COMPATIBILITY_DATE?.trim() || '2026-09-07';
+  const parsedDate = new Date(`${compatibilityDate}T00:00:00Z`);
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(compatibilityDate) ||
+    !Number.isFinite(parsedDate.getTime()) ||
+    parsedDate.toISOString().slice(0, 10) !== compatibilityDate
+  )
+    throw new Error('MGM_COMPATIBILITY_DATE must be a valid YYYY-MM-DD date');
+  const observability = env.MGM_OBSERVABILITY?.trim();
+  if (observability && !['enabled', 'disabled'].includes(observability))
+    throw new Error('MGM_OBSERVABILITY must be enabled or disabled');
   return {
     $schema: sourcePath('./node_modules/wrangler/config-schema.json'),
     name,
@@ -69,11 +85,23 @@ export function createConfig(env, outputPath = resolve(root, configFile)) {
       : {}),
     main: sourcePath('worker/index.ts'),
     tsconfig: sourcePath('worker/tsconfig.json'),
-    compatibility_date: '2026-09-07',
+    compatibility_date: compatibilityDate,
     compatibility_flags: ['nodejs_compat'],
     workers_dev: workersDev,
     preview_urls: false,
-    routes: workersDev ? [] : [{ pattern: site.hostname, custom_domain: true }],
+    routes:
+      workersDev || ingress === 'service-binding'
+        ? []
+        : [{ pattern: site.hostname, custom_domain: true }],
+    ...(observability
+      ? {
+          observability: {
+            enabled: observability === 'enabled',
+            logs: { enabled: observability === 'enabled', head_sampling_rate: 1 },
+            traces: { enabled: observability === 'enabled', head_sampling_rate: 0.01 },
+          },
+        }
+      : {}),
     assets: {
       directory: sourcePath('./dist'),
       binding: 'ASSETS',

@@ -31,6 +31,8 @@ Open the printed localhost URL. Create the first admin using your local setup ke
 
 ## Install on Cloudflare
 
+Installation includes automatic framework updates from MGM `main`, unless the owner explicitly chooses another update policy. A successful manual deployment is only the first step; finish the [installation completion checks](#installation-completion-checks) before handing over the site.
+
 Provision a dedicated Worker, D1 database, and private R2 bucket for each installation. The deploying project owns its instance settings, deployment workflow, and credentials; MGM Design supplies reusable source and scripts. Configure these nonsecret environment variables using that project's existing deployment configuration:
 
 ```text
@@ -43,6 +45,10 @@ MGM_SITE_NAME
 ```
 
 `MGM_SITE_URL` is an HTTPS origin: your custom domain or the Worker's matching `workers.dev` address. `CLOUDFLARE_ACCOUNT_ID` is optional when your login selects one account. Authenticate Wrangler for your account and set the Worker's `SETUP_SECRET` as a secret. Do not put credentials in shared source.
+
+For an existing Pages gateway that forwards through a private service binding, set `MGM_INGRESS_MODE=service-binding` and use the gateway's public origin as `MGM_SITE_URL`. This generates no Worker routes and disables its public and preview URLs; configure the gateway and service binding in the owning project. The default `public` mode uses the custom domain or matching `workers.dev` address above. Set optional `MGM_COMPATIBILITY_DATE=YYYY-MM-DD` to preserve an installation's chosen runtime date; otherwise the framework uses `2026-09-07`. Keep these settings in both local deployment and the installation's build environment.
+
+Optional `MGM_OBSERVABILITY=enabled` configures Worker logs with full sampling and traces with 1% sampling; `disabled` turns both off. Leaving it unset emits no observability configuration. Keep the installation's existing choice consistent between local and automatic deployment.
 
 After cloning MGM Design and running `pnpm install --frozen-lockfile`, create the database and bucket using your own unique names. The database command returns the ID used above:
 
@@ -104,6 +110,15 @@ fi
 Serialize deployments per installation. The commit guard alone cannot prevent an already-running deployment from overtaking a newer deployment. If relying on the account's concurrent-build limit of one, verify that limit during setup and add explicit serialization before increasing it.
 
 Creating instance variables alone does not enable automatic updates: each Worker needs a connected, enabled Builds trigger and an authorized build token. Once configured, pushes to MGM `main` update the framework without consumer version edits. The repository holds no customer credentials or destination registry. If your pipeline checks out the owning project instead, pass the actual MGM source commit as `WORKERS_CI_COMMIT_SHA` and keep the owner and framework checkouts as siblings.
+
+### Installation completion checks
+
+- Inspect the installed pipeline: authorized MGM repository connection, enabled `main` trigger, installation-specific deployment credential/settings, migrations before deployment, and serialization. A local deployment script or configured variables do not establish automatic updates.
+- Verify a real subsequent MGM `main` push automatically starts and completes that installation's build. Compare its MGM source SHA with `buildCommit` from `GET https://<public-site>/api/session`; that endpoint does not require sign-in. A manual build retry verifies recovery, not the Git push trigger. If an upstream push cannot be exercised yet, report update verification as pending.
+- Check existing sign-in and designs after the update. Preserve the installation's Worker, database, bucket, and hosting adapter settings.
+- Record the public URL, backend Worker, update pipeline/trigger reference, source branch, settings location, and verified commit/build in the owning project's documentation. Include how to inspect and retry failures, without recording secret values. Do not add a customer destination registry to MGM.
+
+If a Pages site or other proxy supplies the public hostname, identify the Worker that actually serves MGM. Connect automatic updates to that backend; the proxy's deployment history alone does not describe the framework version. Preserve its service binding and use `MGM_INGRESS_MODE=service-binding` in every automatic deployment. Verify `buildCommit` through the public URL used by viewers.
 
 ## Publish designs
 

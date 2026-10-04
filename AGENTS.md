@@ -9,6 +9,7 @@ Read only the documents relevant to the task:
 - `docs/glossary.md` — project, board, frame, publication, and mode meanings. Read when changing navigation or the shared manifest.
 - `docs/architecture.md` — frontend structure, canvas behavior, and local development. Read for UI or cross-cutting changes.
 - `docs/backend.md` — authentication, publication API/schema, storage, and sandbox contracts. Read before backend or publisher changes.
+- `README.md#automatic-framework-updates` and `website/features/installation.html` — installation setup and its completion checks. Read before provisioning or changing an installation's deployment pipeline.
 - `website/index.html` — directly openable human guide. Update affected feature pages when user workflows change.
 
 Keep this routing list synchronized with maintained files under `docs/`. Documentation describes implemented behavior; plans and investigations belong in GitHub issues. Use glossary definitions consistently. Keep technical explanations brief and plain. A change is complete when relevant tests pass and affected documentation is current.
@@ -20,4 +21,5 @@ Keep this routing list synchronized with maintained files under `docs/`. Documen
 - Never commit `.dev.vars`, `.env*`, generated instance configuration, preview grant URLs, session cookies, or publishing tokens.
 - Never grant mocks `allow-same-origin`, public R2 access, or authenticated CORS based on `Origin: null`.
 - Each installation owns its database, bucket, accounts, and deployment configuration. Shared source contains no customer resource inventory.
+- New installations follow MGM `main` unless the owner explicitly chooses otherwise. Setup is incomplete until a real upstream push triggers deployment and the public site's `/api/session` reports the expected `buildCommit`. Verify the backend Worker even when a Pages site supplies its hostname; record nonsecret wiring and evidence in the owning project.
 - Keep documentation in `docs/`, the human guide in `website/`, and planned work in GitHub issues. Follow the github-issues skill for tickets.

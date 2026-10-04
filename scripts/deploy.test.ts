@@ -123,6 +123,60 @@ describe('instance deployment', () => {
     expect(worker.r2_buckets).toEqual(custom.r2_buckets);
   });
 
+  it('preserves a private Worker behind a public gateway without claiming its hostname', () => {
+    const config = createConfig({
+      ...env,
+      MGM_INGRESS_MODE: 'service-binding',
+      MGM_SITE_URL: 'https://example-design.pages.dev',
+      MGM_COMPATIBILITY_DATE: '2026-09-29',
+      MGM_OBSERVABILITY: 'enabled',
+    });
+    expect(config.workers_dev).toBe(false);
+    expect(config.preview_urls).toBe(false);
+    expect(config.routes).toEqual([]);
+    expect(config.vars.SITE_URL).toBe('https://example-design.pages.dev');
+    expect(config.compatibility_date).toBe('2026-09-29');
+    expect(config.d1_databases).toEqual(createConfig(env).d1_databases);
+    expect(config.r2_buckets).toEqual(createConfig(env).r2_buckets);
+    expect(config.observability).toMatchObject({
+      enabled: true,
+      logs: { enabled: true },
+      traces: { enabled: true, head_sampling_rate: 0.01 },
+    });
+  });
+
+  it('only configures observability when explicitly selected', () => {
+    expect(createConfig(env).observability).toBeUndefined();
+    expect(createConfig({ ...env, MGM_OBSERVABILITY: 'disabled' }).observability).toMatchObject({
+      enabled: false,
+      logs: { enabled: false },
+      traces: { enabled: false },
+    });
+    expect(() => createConfig({ ...env, MGM_OBSERVABILITY: 'unknown' })).toThrow(
+      'MGM_OBSERVABILITY',
+    );
+  });
+
+  it('rejects an unknown ingress mode or a private Worker using its disabled public address', () => {
+    expect(() => createConfig({ ...env, MGM_INGRESS_MODE: 'private' })).toThrow('MGM_INGRESS_MODE');
+    expect(() =>
+      createConfig({
+        ...env,
+        MGM_INGRESS_MODE: 'service-binding',
+        MGM_SITE_URL: 'https://example-design.owner.workers.dev',
+      }),
+    ).toThrow('gateway URL');
+  });
+
+  it.each(['2026-02-29', '2026-13-01', '2026/09/29', 'not-a-date'])(
+    'rejects an invalid compatibility date %s',
+    (date) => {
+      expect(() => createConfig({ ...env, MGM_COMPATIBILITY_DATE: date })).toThrow(
+        'MGM_COMPATIBILITY_DATE',
+      );
+    },
+  );
+
   it.each([0, 1])('stops on a failed preflight or migration (step %i)', (failAt) => {
     const calls: string[][] = [];
     expect(() =>

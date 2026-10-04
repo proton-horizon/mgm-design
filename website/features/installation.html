@@ -24,8 +24,8 @@
       </p>
       <p>
         A separate client or design collection gets its own installation and resources when needed.
-        A single design site needs only one installation. Each site can continue operating under
-        its owner's control.
+        A single design site needs only one installation. Each site can continue operating under its
+        owner's control.
       </p>
       <h2>Two independent update flows</h2>
       <div class="cards">
@@ -41,8 +41,8 @@
           <h3>Publish an app's designs</h3>
           <p>
             Push mocks in the app repository's <code>design/</code> directory to its main branch.
-            That repository's GitHub Actions job sends the bundle to MGM's publishing API. It uses
-            a project publishing token and does not redeploy the viewer.
+            That repository's GitHub Actions job sends the bundle to MGM's publishing API. It uses a
+            project publishing token and does not redeploy the viewer.
           </p>
         </section>
       </div>
@@ -52,6 +52,11 @@
         <a href="publishing.html">Publish designs</a> for the source-repository setup.
       </p>
       <h2>Deploy</h2>
+      <p>
+        A new installation includes automatic updates from MGM's main branch unless its owner
+        explicitly chooses another policy. Opening the site after a manual deployment is the first
+        step; finish the update checks below before considering setup complete.
+      </p>
       <p>
         Follow the <a href="../../README.md">README setup commands</a>. Configure the instance's
         Worker name, database name and ID, bucket name, site URL and display name using your
@@ -84,8 +89,8 @@
       <ol>
         <li>
           In GitHub's installed Cloudflare Workers and Pages app settings, authorize the MGM
-          repository. When using selected repositories, add MGM and keep existing selections.
-          A successful clone of a public repository does not establish permission to receive pushes.
+          repository. When using selected repositories, add MGM and keep existing selections. A
+          successful clone of a public repository does not establish permission to receive pushes.
         </li>
         <li>Connect the shared MGM repository to the installation's existing Worker.</li>
         <li>Select main as the production branch and disable preview deployments.</li>
@@ -102,11 +107,36 @@
           site, then confirm existing accounts and designs still work.
         </li>
       </ol>
+      <h2>Know that setup is complete</h2>
       <p>
-        Only one deployment may run at a time for an installation. The deployment command checks
-        the current main commit and skips outdated builds. That check does not replace serialization:
-        an older deployment already in progress must finish before another starts. If setup relies
-        on an account-wide build limit of one, check that limit before enabling updates and before
+        Check the installed repository connection, enabled main trigger, deployment credential,
+        migration command, and deployment ordering. Then verify a real subsequent MGM main push
+        starts and completes a build for this installation. At the site's public
+        <code>/api/session</code> address, <code>buildCommit</code> must match that build's MGM
+        source commit. This check does not require signing in. A manually retried build does not
+        prove the push trigger works; report verification as pending until a real push is checked.
+      </p>
+      <p>
+        If a Pages site supplies the hostname, it may forward requests to a separate MGM Worker.
+        That backend Worker needs the update pipeline. Preserve the proxy's service binding and set
+        <code>MGM_INGRESS_MODE=service-binding</code> in both local and automatic deployment
+        settings, with the public Pages origin as <code>MGM_SITE_URL</code>. This keeps the backend
+        private instead of trying to attach the Pages hostname as its custom domain. Optional
+        <code>MGM_COMPATIBILITY_DATE</code> preserves the installation's runtime date. Check the
+        framework version through the public address that viewers use, then confirm existing sign-in
+        and designs still work.
+      </p>
+      <p>
+        Keep a short record in the project that owns the installation: public address, backend
+        Worker, pipeline reference, source branch, settings location, and verified commit/build.
+        Include where to inspect and retry a failed update. Record no passwords or tokens, and keep
+        this installation inventory out of MGM's shared source.
+      </p>
+      <p>
+        Only one deployment may run at a time for an installation. The deployment command checks the
+        current main commit and skips outdated builds. That check does not replace serialization: an
+        older deployment already in progress must finish before another starts. If setup relies on
+        an account-wide build limit of one, check that limit before enabling updates and before
         increasing build concurrency.
       </p>
       <h2>Credentials and MCP</h2>
@@ -128,8 +158,8 @@
         Cloudflare browser when the connected MCP credential does not have it. If an initial build
         connection fails through the API, complete it in the dashboard, then use MCP for
         deployment-token registration, build settings, and starting and inspecting builds. MCP
-        access and the deployment token are separate credentials. Ordinary
-        main-branch updates run in Cloudflare without an agent or browser session.
+        access and the deployment token are separate credentials. Ordinary main-branch updates run
+        in Cloudflare without an agent or browser session.
       </p>
       <h2>Move to a custom hostname</h2>
       <p>
@@ -159,8 +189,9 @@
         </li>
         <li>
           <strong>Framework build failed:</strong> inspect its Cloudflare build log for the failing
-          install, test, migration, or deployment step. Check token access and installation variables.
-          Fix the cause and retry against current main; do not replace the database or bucket.
+          install, test, migration, or deployment step. Check token access and installation
+          variables. Fix the cause and retry against current main; do not replace the database or
+          bucket.
         </li>
         <li>
           <strong>Mocks are older than expected:</strong> inspect the project's latest publication
