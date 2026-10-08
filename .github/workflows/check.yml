@@ -22,3 +22,4 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium webkit
       - run: node scripts/check-canvas.mjs
       - run: node scripts/check-access.mjs
+      - run: node scripts/check-appearance.mjs

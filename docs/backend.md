@@ -127,3 +127,22 @@ Grant URLs are short-lived bearer capabilities: anyone possessing one can replay
 Mock CSP allows inline scripts/styles and resources under the exact grant prefix, images via data/blob URLs, and blob URLs for model loading. It blocks frames, forms, plugins, workers, arbitrary external networks, and privileged app storage/origin access. Bundles must contain their compatible renderer, loader, fonts, models, textures and modules and use relative resource URLs. There is no host-side runtime dependency installation.
 
 The supported v1 3D profile uses bundled classic JavaScript with Three.js/GLTFLoader and self-contained, uncompressed GLB models. The accepted character study uses ordinary materials, separate clothing meshes, and whole-model animation; its pipeline does not require textures or skeletal deformation. Chromium/WebKit checks cover protected model loading, direct navigation, controls, reduced motion, and context-loss fallback; the owner confirmed iPhone/iPad use. No minimum browser version is promised. Module/dynamic-import, font, textured/skinned model and decoder pipelines need their own runtime checks before use. See [the completed validation](https://github.com/proton-horizon/mgm-design/issues/2) for exact coverage.
+
+## Live appearance
+
+MGM owns Light/Dark while a frame is open in Interact. This applies to every project without manifest fields, per-site settings, or changes to the publication schema. The viewer sets the iframe’s `color-scheme`; native CSS `prefers-color-scheme` and JavaScript `matchMedia` inherit it, including changes while open. JavaScript consumers must listen for media-query changes if they cache the result. See [browser inheritance behavior](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/At-rules/@media/prefers-color-scheme#embedded_elements).
+
+Mocks that use explicit classes, theme providers, or a 3D palette connect the following messages once in their shared runtime:
+
+| Direction                                     | Message                                                          |
+| --------------------------------------------- | ---------------------------------------------------------------- |
+| Mock → viewer, after registering its listener | `{type:'mgm:appearance:ready', version:1}`                       |
+| Viewer → active mock                          | `{type:'mgm:appearance', version:1, appearance:'light'\|'dark'}` |
+
+The viewer sends current appearance on iframe load, valid readiness, and preference changes. It accepts readiness only from the active iframe’s `contentWindow` with the sandbox’s `event.origin === 'null'`. It never accepts an appearance choice from a mock. The outbound message contains only appearance, with `targetOrigin: '*'` because the receiving sandbox has an opaque origin. No credentials, grants, user information, or other capabilities cross this channel.
+
+The mock registers its listener before sending readiness to the exact viewer origin, obtained from `new URL(location.href).origin` under MGM’s same-host protected delivery contract. Accept replies only when `parent !== window`, `event.source === parent`, `event.origin` equals that expected origin, the message type/version match, and appearance is exactly `light` or `dark`. Reject malformed values. Do not trust `Origin: null`, query parameters, or messages from unrelated windows as viewer authority.
+
+Apply accepted state through the mock’s existing shared theme function without reloading, clearing drafts, or rebuilding navigation. MGM’s selection takes precedence over browser preference, authored fixture appearance, and mock-local theme controls during Interact. New documents repeat the readiness handshake. Outside Interact, including standalone screenshots, retain the authored initial appearance or browser fallback. Pan images are fixed publication assets; changing MGM appearance does not regenerate them.
+
+The viewer does not rewrite mock CSS or access its DOM. Hardcoded colors and custom themes need suitable light/dark styles and the shared consumer above. Implement that once per app runtime, not separately per frame. Test native media inheritance with browser automation’s forced color-scheme emulation disabled; Playwright’s per-frame override otherwise masks native inheritance. `scripts/check-appearance.mjs` verifies both browser engines, live changes, state retention, navigation, message validation, and unchanged static previews.

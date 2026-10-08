@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Hand, Minus, MousePointer2, Plus, Scan, X } from 'lucide-react';
-import type { Board } from './types';
+import type { Appearance, Board } from './types';
 import { bounds, fitView, placeFrames, zoomAt, type View } from './canvas-math';
 import { useDialog } from './useDialog';
 import { frameIntersectsViewport } from './frame-visibility';
+import InteractiveFrame from './InteractiveFrame';
+import AppearanceToggle from './AppearanceToggle';
 
-export default function Canvas({ board }: { board: Board }) {
+export default function Canvas({
+  board,
+  appearance,
+  onAppearanceChange,
+}: {
+  board: Board;
+  appearance: Appearance;
+  onAppearanceChange: (appearance: Appearance) => void;
+}) {
   const frames = useMemo(() => placeFrames(board.frames), [board.frames]);
   const viewport = useRef<HTMLDivElement>(null);
   // No preview loads before the first measurement and fit, even if ResizeObserver is delayed.
@@ -355,7 +365,8 @@ export default function Canvas({ board }: { board: Board }) {
             <button className="plain-button" autoFocus onClick={() => setInteracting(false)}>
               <ArrowLeft size={16} /> Back to canvas
             </button>
-            <span>{active.name}</span>
+            <span className="interaction-title">{active.name}</span>
+            <AppearanceToggle compact appearance={appearance} onChange={onAppearanceChange} />
             <span className="interaction-mode">
               <MousePointer2 size={12} />
               Interact mode
@@ -363,16 +374,14 @@ export default function Canvas({ board }: { board: Board }) {
           </div>
           <div className="interaction-stage">
             {pageVisible && (
-              <iframe
-                title={`Interactive ${active.name}`}
-                src={active.entry}
-                sandbox="allow-scripts"
-                referrerPolicy="no-referrer"
-                style={{
-                  width: active.width,
-                  height: active.height,
-                  transform: `translate(-50%, -50%) scale(${Math.min((windowSize.width - 32) / active.width, (windowSize.height - 133) / active.height, 1)})`,
-                }}
+              <InteractiveFrame
+                frame={active}
+                appearance={appearance}
+                scale={Math.min(
+                  (windowSize.width - 32) / active.width,
+                  (windowSize.height - 133) / active.height,
+                  1,
+                )}
               />
             )}
           </div>

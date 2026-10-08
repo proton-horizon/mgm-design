@@ -1380,3 +1380,14 @@ h3 {
 .row-actions select {
   max-width: 140px;
 }
+
+.interaction-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.interaction-header .appearance-toggle {
+  flex-shrink: 0;
+  white-space: nowrap;
+}

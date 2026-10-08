@@ -11,19 +11,18 @@ import {
   LoaderCircle,
   LogOut,
   Menu,
-  Moon,
   PanelLeftClose,
   Plus,
   RefreshCw,
   Search,
   Settings2,
-  Sun,
   X,
 } from 'lucide-react';
 import { request, service } from './api';
 import type { Project, Session } from './types';
 import Canvas from './Canvas';
 import Admin from './Admin';
+import AppearanceToggle from './AppearanceToggle';
 import { AccountAccess, ChangePassword } from './AccountAccess';
 
 function Mark({ small = false }: { small?: boolean }) {
@@ -59,6 +58,7 @@ export default function App({ initialAccountToken = '' }: { initialAccountToken?
   const search = useRef<HTMLInputElement>(null);
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+    document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
     localStorage.setItem('mgm-theme', dark ? 'dark' : 'light');
   }, [dark]);
   async function load() {
@@ -309,10 +309,10 @@ export default function App({ initialAccountToken = '' }: { initialAccountToken?
           <button className="sidebar-link" onClick={() => setHelp(true)}>
             <CircleHelp size={16} /> Canvas shortcuts
           </button>
-          <button className="sidebar-link" onClick={() => setDark(!dark)}>
-            {dark ? <Sun size={16} /> : <Moon size={16} />}{' '}
-            {dark ? 'Light appearance' : 'Dark appearance'}
-          </button>
+          <AppearanceToggle
+            appearance={dark ? 'dark' : 'light'}
+            onChange={(value) => setDark(value === 'dark')}
+          />
           {session.user.role === 'admin' && (
             <button className="sidebar-link" onClick={() => setAdmin(true)}>
               <Settings2 size={16} /> Site administration
@@ -441,7 +441,12 @@ export default function App({ initialAccountToken = '' }: { initialAccountToken?
                 {selected.board.frames.length} screens
               </span>
             </section>
-            <Canvas key={selected.key} board={selected.board} />
+            <Canvas
+              key={selected.key}
+              board={selected.board}
+              appearance={dark ? 'dark' : 'light'}
+              onAppearanceChange={(value) => setDark(value === 'dark')}
+            />
           </>
         ) : (
           <div className="empty-state">

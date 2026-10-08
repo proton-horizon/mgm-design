@@ -8,11 +8,13 @@ An installation's deploying project owns its settings, private local files, and 
 
 ## Navigation and presentation
 
-The sidebar lists projects and their boards. Board selection uses `#board=project%2Fboard` links and browser history. Search matches project and board names. A compact drawer replaces the sidebar below 760 CSS pixels. Light/dark appearance persists in browser storage. Accounts have email/password credentials and either site-admin or viewer access.
+The sidebar lists projects and their boards. Board selection uses `#board=project%2Fboard` links and browser history. Search matches project and board names. A compact drawer replaces the sidebar below 760 CSS pixels. Light/dark appearance persists in browser storage and is shared across projects and boards. Accounts have email/password credentials and either site-admin or viewer access.
 
 Each board shows its complete frame layout in Pan mode. Frames use manifest coordinates, or default to a horizontal sequence with 80 CSS pixels between screens. The camera stores translation and scale; `src/canvas-math.ts` computes fit and focal-point zoom. Scale ranges from 8% to 300%. Drag or two-finger scroll pans; two-touch pinch and modified wheel zoom keep the focal point fixed. F/0 fits all screens, 1 restores actual size, +/- zoom, and arrow keys pan when the canvas has focus.
 
 Select a screen or use Jump to screen, then choose Interact. A separate single-frame view receives pointer input while preserving the declared viewport and fitting the available space. Back to canvas returns to navigation. Previous/next switches frames. The canvas blocks iframe pointer input in Pan mode.
+
+`src/AppearanceToggle.tsx` displays the current Light/Dark setting in the sidebar and Interact header. Both controls change the same viewer preference. `src/InteractiveFrame.tsx` applies it to the iframe’s `color-scheme` and sends the [live appearance contract](backend.md#live-appearance) to custom theme consumers. Changing appearance updates the current document without reloading it, preserving drafts and navigation state. Pan images remain the publication’s authored review states.
 
 Pan mode uses the publication’s static frame images at every zoom level. Panning, zooming, and selecting a frame never start its HTML document. `src/frame-visibility.ts` restricts images to the measured viewport; each generated image has a longest edge of 640 pixels. Missing or failed images show a labeled Open screen fallback; use Jump to screen and Interact to open them. Interact mounts one isolated document, and returning to Pan removes it. Switching screens or returning from a hidden tab can reset a mock's transient state. Offscreen images and previews in hidden tabs are unmounted.
 

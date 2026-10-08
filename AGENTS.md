@@ -8,7 +8,7 @@ Read only the documents relevant to the task:
 
 - `docs/glossary.md` — project, board, frame, publication, and mode meanings. Read when changing navigation or the shared manifest.
 - `docs/architecture.md` — frontend structure, canvas behavior, and local development. Read for UI or cross-cutting changes.
-- `docs/backend.md` — authentication, publication API/schema, storage, and sandbox contracts. Read before backend or publisher changes.
+- `docs/backend.md` — authentication, publication API/schema, storage, sandbox, and live appearance contracts. Read before backend, publisher, or mock integration changes.
 - `README.md#automatic-framework-updates` and `website/features/installation.html` — installation setup and its completion checks. Read before provisioning or changing an installation's deployment pipeline.
 - `website/index.html` — directly openable human guide. Update affected feature pages when user workflows change.
 
