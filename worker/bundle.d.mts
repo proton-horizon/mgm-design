@@ -23,6 +23,7 @@ export interface Manifest {
 }
 export const MAX_FILES: number;
 export const MAX_BYTES: number;
+export const MAX_UPLOAD_BYTES: number;
 export function contentType(path: string): string | undefined;
 export function safePath(path: unknown): boolean;
 export function validateManifest(manifest: unknown, projectId: string): Manifest;

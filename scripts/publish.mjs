@@ -2,6 +2,7 @@
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { readBundle } from './read-bundle.mjs';
+import { MAX_UPLOAD_BYTES } from '../worker/bundle.mjs';
 
 const args = process.argv.slice(2);
 function option(name, fallback) {
@@ -28,10 +29,13 @@ if (url.username || url.password || url.pathname !== '/' || url.search || url.ha
   throw new Error('Site must be an origin URL without credentials, path, query or fragment.');
 const base = `${url.origin}/api/publish/${encodeURIComponent(project)}/attempts`;
 async function send(path, method, value) {
+  const body = JSON.stringify(value);
+  if (method === 'PUT' && Buffer.byteLength(body) > MAX_UPLOAD_BYTES)
+    throw new Error(`Publication JSON exceeds ${MAX_UPLOAD_BYTES / 1024 / 1024} MiB.`);
   const response = await fetch(path, {
     method,
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify(value),
+    body,
     redirect: 'error',
     signal: AbortSignal.timeout(120000),
   });

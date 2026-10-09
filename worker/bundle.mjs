@@ -1,5 +1,7 @@
-export const MAX_FILES = 300;
-export const MAX_BYTES = 20 * 1024 * 1024;
+export const MAX_FILES = 400;
+export const MAX_BYTES = 24 * 1024 * 1024;
+// Base64 plus bounded manifest/path overhead, including escaped Unicode metadata.
+export const MAX_UPLOAD_BYTES = 34 * 1024 * 1024;
 export const MIME_TYPES = Object.freeze({
   html: 'text/html; charset=utf-8',
   css: 'text/css; charset=utf-8',
@@ -76,7 +78,9 @@ export function validateManifest(manifest, projectId) {
     manifest.files.some((path) => !safePath(path)) ||
     new Set(manifest.files).size !== manifest.files.length
   )
-    throw new Error('Manifest files must contain unique permitted relative paths (maximum 300).');
+    throw new Error(
+      `Manifest files must contain unique permitted relative paths (maximum ${MAX_FILES}).`,
+    );
   if (!Array.isArray(manifest.boards) || manifest.boards.length > 50)
     throw new Error('Manifest boards must be an array (maximum 50).');
   if (!manifest.boards.length && manifest.empty !== true)
@@ -153,16 +157,19 @@ export function decodeBundle(body, projectId) {
       (value.includes('=') && !/^={1,2}$/.test(value.slice(value.indexOf('='))))
     )
       throw new Error('Invalid base64 file.');
-    let binary;
+    const size = (value.length / 4) * 3 - (value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0);
+    total += size;
+    if (total > MAX_BYTES) throw new Error(`Bundle exceeds ${MAX_BYTES / 1024 / 1024} MiB.`);
+    const bytes = new Uint8Array(size);
     try {
-      binary = atob(value);
+      // Decode in aligned blocks so a large file never needs a second full binary string.
+      for (let start = 0, offset = 0; start < value.length; start += 65536) {
+        const binary = atob(value.slice(start, start + 65536));
+        for (let i = 0; i < binary.length; i++) bytes[offset++] = binary.charCodeAt(i);
+      }
     } catch {
       throw new Error('Invalid base64 file.');
     }
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    total += bytes.length;
-    if (total > MAX_BYTES) throw new Error('Bundle exceeds 20 MiB.');
     decoded.push({ path, bytes, contentType: contentType(path) });
   }
   return { manifest, files: decoded, total };

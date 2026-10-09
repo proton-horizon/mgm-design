@@ -52,9 +52,15 @@
       </p>
       <p>
         Images are generated in temporary storage; your <code>design/</code> source is unchanged.
-        They count toward the 300-file and 20 MiB bundle limits. If capture fails or the bundle is
+        They count toward the 400-file and 24 MiB bundle limits. If capture fails or the bundle is
         too large, the previous publication stays visible and the workflow reports the failure.
         Update the destination’s MGM Design installation before first publishing overview images.
+      </p>
+      <p>
+        Update the destination MGM installation and publisher before using the increased capacity.
+        The publishing command stays the same. The 34 MiB upload allowance includes base64 encoding
+        and metadata; the actual files, including previews, must fit within 24 MiB. Large bundles
+        need enough Worker CPU time; upgrading a plan does not increase its 128 MB memory limit.
       </p>
       <h2>Preview while working locally</h2>
       <p>

@@ -14,7 +14,7 @@ export async function generatePreviews(input, { onProgress = console.log } = {})
   );
   if (!pending.length) return bundle;
   if (bundle.manifest.files.length + pending.length > MAX_FILES)
-    throw new Error('Generated previews would exceed the 300-file publication limit.');
+    throw new Error(`Generated previews would exceed the ${MAX_FILES}-file publication limit.`);
   const directory = await mkdtemp(join(tmpdir(), 'mgm-previews-'));
   let preview, browser;
   let total = validated.total;
@@ -101,7 +101,7 @@ export async function generatePreviews(input, { onProgress = console.log } = {})
         total += bytes.length;
         if (total > MAX_BYTES)
           throw new Error(
-            'Generated previews exceed the 20 MiB publication limit; reduce source asset sizes.',
+            `Generated previews exceed the ${MAX_BYTES / 1024 / 1024} MiB publication limit; reduce source asset sizes.`,
           );
         frame.preview = path;
         bundle.manifest.files.push(path);

@@ -2,7 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Miniflare } from 'miniflare';
 import { build } from 'esbuild';
 import { applyMigrations } from '../../scripts/local-preview.mjs';
-import { decodeBundle, validateManifest } from '../../worker/bundle.mjs';
+import {
+  decodeBundle,
+  validateManifest,
+  MAX_BYTES,
+  MAX_FILES,
+  MAX_UPLOAD_BYTES,
+} from '../../worker/bundle.mjs';
 
 const origin = 'https://design.example.com';
 let mf: Miniflare;
@@ -329,11 +335,11 @@ describe('deployment backend', () => {
       ).status,
     ).toBe(401);
   });
-  it('handles the complete 20 MiB decoded-file boundary without changing the active set on excess input', async () => {
+  it('handles the complete 24 MiB decoded-file boundary without changing the active set on excess input', async () => {
     const extended = { ...manifest, files: [...manifest.files, 'assets/large.bin'] };
     const htmlBytes = Buffer.from(bundle.files['app/index.html'], 'base64').length;
     const moduleBytes = Buffer.from(bundle.files['app/main.js'], 'base64').length;
-    const large = Buffer.alloc(20 * 1024 * 1024 - htmlBytes - moduleBytes);
+    const large = Buffer.alloc(MAX_BYTES - htmlBytes - moduleBytes);
     await attempt('full-limit', 11);
     expect(
       (
@@ -358,6 +364,78 @@ describe('deployment backend', () => {
     const response = await request('/api/projects', { cookie: adminCookie });
     expect(((await response.json()) as any).projects[0].activePublication.id).toBe('full-limit');
   }, 30000);
+  it('accepts 400 files and rejects a 401st file without replacing the active publication', async () => {
+    const files = { ...bundle.files } as Record<string, string>;
+    for (let i = Object.keys(files).length; i < MAX_FILES; i++) files[`assets/${i}.bin`] = '';
+    const full = { manifest: { ...manifest, files: Object.keys(files) }, files };
+    await attempt('file-count-limit', 13);
+    expect((await upload('file-count-limit', full)).status).toBe(200);
+    files['assets/excess.bin'] = '';
+    full.manifest.files.push('assets/excess.bin');
+    await attempt('file-count-excess', 14);
+    expect((await upload('file-count-excess', full)).status).toBe(400);
+    const projects = (await (
+      await request('/api/projects', { cookie: adminCookie })
+    ).json()) as any;
+    expect(projects.projects[0].activePublication.id).toBe('file-count-limit');
+  });
+  it('bounds the JSON envelope by bytes even without Content-Length', async () => {
+    await attempt('envelope-limit', 15);
+    const json = JSON.stringify(bundle);
+    const padded = json + ' '.repeat(MAX_UPLOAD_BYTES - Buffer.byteLength(json));
+    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${projectToken}` };
+    const path = origin + '/api/publish/rubber-ducky/attempts/envelope-limit';
+    expect((await mf.dispatchFetch(path, { method: 'PUT', headers, body: padded })).status).toBe(
+      200,
+    );
+    await attempt('envelope-excess', 16);
+    const excessPath = origin + '/api/publish/rubber-ducky/attempts/envelope-excess';
+    expect(
+      (
+        await mf.dispatchFetch(excessPath, {
+          method: 'PUT',
+          headers: { ...headers, 'Content-Length': String(MAX_UPLOAD_BYTES + 1) },
+          body: padded + ' ',
+        })
+      ).status,
+    ).toBe(413);
+    const bytes = new TextEncoder().encode(padded + ' ');
+    let offset = 0;
+    const stream = new ReadableStream({
+      pull(controller) {
+        if (offset === bytes.length) return controller.close();
+        const end = Math.min(offset + 65536, bytes.length);
+        controller.enqueue(bytes.subarray(offset, end));
+        offset = end;
+      },
+    });
+    expect(
+      (await mf.dispatchFetch(excessPath, { method: 'PUT', headers, body: stream, duplex: 'half' }))
+        .status,
+    ).toBe(413);
+    const projects = (await (
+      await request('/api/projects', { cookie: adminCookie })
+    ).json()) as any;
+    expect(projects.projects[0].activePublication.id).toBe('envelope-limit');
+  }, 30000);
+  it('decodes binary data across block boundaries and rejects malformed padding', () => {
+    for (const length of [49151, 49152, 49153, 98305]) {
+      const bytes = Buffer.from(Array.from({ length }, (_, i) => i % 256));
+      const input = {
+        ...bundle,
+        files: { ...bundle.files, 'app/main.js': bytes.toString('base64') },
+      };
+      expect(Buffer.from(decodeBundle(input, 'rubber-ducky').files[1].bytes)).toEqual(bytes);
+    }
+    for (const value of ['A===', 'AA=A', 'A'.repeat(65535) + '=AAAA', 'AAA!']) {
+      expect(() =>
+        decodeBundle(
+          { ...bundle, files: { ...bundle.files, 'app/main.js': value } },
+          'rubber-ducky',
+        ),
+      ).toThrow('base64');
+    }
+  });
   it('rejects path traversal, unexpected files, invalid empty input, and incompatible schemas', () => {
     expect(() => validateManifest({ ...manifest, schemaVersion: 2 }, 'rubber-ducky')).toThrow(
       'schemaVersion',

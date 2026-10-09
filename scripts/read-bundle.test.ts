@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, truncate, writeFile } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readBundle } from './read-bundle.mjs';
+import { MAX_BYTES } from '../worker/bundle.mjs';
 
 let temporary: string;
 let directory: string;
@@ -79,9 +80,9 @@ describe('source bundle reading', () => {
 
   it('rejects oversized files before buffering and accepts deliberate empty publications', async () => {
     await writeFile(join(directory, 'oversized.bin'), '');
-    await truncate(join(directory, 'oversized.bin'), 20 * 1024 * 1024 + 1);
+    await truncate(join(directory, 'oversized.bin'), MAX_BYTES + 1);
     await saveManifest({ ...manifest, files: [...manifest.files, 'oversized.bin'] });
-    await expect(readBundle(directory)).rejects.toThrow('20 MiB');
+    await expect(readBundle(directory)).rejects.toThrow('24 MiB');
     await saveManifest({
       schemaVersion: 1,
       project: manifest.project,

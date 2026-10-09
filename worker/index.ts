@@ -1,4 +1,4 @@
-import { contentType, decodeBundle, safePath, type Manifest } from './bundle.mjs';
+import { contentType, decodeBundle, safePath, MAX_UPLOAD_BYTES, type Manifest } from './bundle.mjs';
 import { passwordHasher, DUMMY_PASSWORD_HASH, PasswordCompatibilityError } from './passwords';
 
 export interface Env {
@@ -152,31 +152,24 @@ async function body(request: Request, max = 65536): Promise<Record<string, any>>
     throw new HttpError(415, 'Send application/json.');
   if (Number(request.headers.get('content-length')) > max)
     throw new HttpError(413, 'Request too large.');
-  const reader = request.body?.getReader();
-  if (!reader) throw new HttpError(400, 'Missing body.');
-  const chunks: Uint8Array[] = [];
+  if (!request.body) throw new HttpError(400, 'Missing body.');
   let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.length;
-    if (size > max) {
-      await reader.cancel();
-      throw new HttpError(413, 'Request too large.');
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.length;
-  }
+  const limited = request.body.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        size += chunk.byteLength;
+        if (size > max) throw new HttpError(413, 'Request too large.');
+        controller.enqueue(chunk);
+      },
+    }),
+  );
   try {
-    const data = JSON.parse(new TextDecoder().decode(bytes));
+    // Let the runtime consume the bounded stream without retaining and merging a second byte copy.
+    const data = await new Response(limited).json();
     if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error();
     return data;
-  } catch {
+  } catch (error) {
+    if (error instanceof HttpError) throw error;
     throw new HttpError(400, 'Invalid JSON.');
   }
 }
@@ -780,7 +773,7 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
         throw new HttpError(409, 'This attempt is already finished. Register a new attempt.');
       let bundle;
       try {
-        bundle = decodeBundle(await body(request, 29 * 1024 * 1024), project.id);
+        bundle = decodeBundle(await body(request, MAX_UPLOAD_BYTES), project.id);
       } catch (error) {
         if (error instanceof HttpError) throw error;
         throw new HttpError(400, error instanceof Error ? error.message : 'Invalid bundle.');

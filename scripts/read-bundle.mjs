@@ -15,10 +15,11 @@ export async function readBundle(directory, projectId) {
       throw new Error('A listed file resolves outside design/.');
     const info = await stat(absolute);
     if (!info.isFile()) throw new Error('Every listed path must resolve to a regular file.');
-    if (total + info.size > MAX_BYTES) throw new Error('Bundle exceeds 20 MiB.');
+    if (total + info.size > MAX_BYTES)
+      throw new Error(`Bundle exceeds ${MAX_BYTES / 1024 / 1024} MiB.`);
     const bytes = await readFile(absolute);
     total += bytes.length;
-    if (total > MAX_BYTES) throw new Error('Bundle exceeds 20 MiB.');
+    if (total > MAX_BYTES) throw new Error(`Bundle exceeds ${MAX_BYTES / 1024 / 1024} MiB.`);
     files[path] = bytes.toString('base64');
   }
   return { manifest, files };
