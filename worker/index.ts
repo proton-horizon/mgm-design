@@ -1,5 +1,6 @@
 import { contentType, decodeBundle, safePath, MAX_UPLOAD_BYTES, type Manifest } from './bundle.mjs';
 import { passwordHasher, DUMMY_PASSWORD_HASH, PasswordCompatibilityError } from './passwords';
+import { storePublicationFiles } from './publication-files';
 
 export interface Env {
   DB: D1Database;
@@ -790,10 +791,7 @@ async function api(request: Request, env: Env, db: Store, url: URL): Promise<Res
           'This attempt was superseded or is already uploading. Register a new attempt.',
         );
       // A single uploader owns immutable attempt paths, including during retries and concurrent requests.
-      for (const file of bundle.files)
-        await env.MOCKS.put(`${project.id}/${attempt.id}/${file.path}`, file.bytes, {
-          httpMetadata: { contentType: file.contentType },
-        });
+      await storePublicationFiles(env.MOCKS, `${project.id}/${attempt.id}`, bundle.files);
       const manifest = JSON.stringify(bundle.manifest);
       await db.batch([
         [

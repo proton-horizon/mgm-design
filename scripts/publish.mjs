@@ -67,9 +67,11 @@ try {
     bundle = await generatePreviews(bundle);
   }
   const { manifest, files } = bundle;
+  const uploadStarted = performance.now();
+  console.log(`Uploading ${project}: ${manifest.files.length} files (120-second deadline).`);
   await send(`${base}/${attemptId}`, 'PUT', { manifest, files });
   console.log(
-    `Published ${project}: ${manifest.boards.length} boards, ${manifest.files.length} files to ${url.origin}.`,
+    `Published ${project}: ${manifest.boards.length} boards, ${manifest.files.length} files to ${url.origin} in ${((performance.now() - uploadStarted) / 1000).toFixed(1)}s.`,
   );
 } catch (error) {
   if (attemptId) {

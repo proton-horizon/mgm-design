@@ -112,6 +112,8 @@ Generated JPEGs live under `mgm-previews/<board>/<frame>.jpg` in the uploaded bu
 
 Every publishing request uses `Authorization: Bearer <project token>`. Tokens contain 256 random bits, are hashed in D1, and can modify only the registered project's publication content and status.
 
+The Worker stores up to four files concurrently per upload, below its six-connection limit. A storage failure stops scheduling new writes and waits for started writes to settle before returning an error. Partial files stay under the unfinished attempt; they cannot become active. The publisher logs the start and elapsed time of the upload separately from preview generation and retains a 120-second request deadline. Update the destination Worker to receive storage performance fixes; no source-mock changes are needed.
+
 1. `POST /api/publish/:projectId/attempts` accepts `{id?,sequence?,commit?,ref?,runUrl?}` and returns `{attemptId}`. Caller-supplied ids make registration idempotent. `runUrl`, when provided, must be a direct HTTPS `github.com/.../actions/runs/...` URL. Register before preparing a bundle if preparation failures should be visible.
 2. `PUT /api/publish/:projectId/attempts/:attemptId` accepts `{manifest,files:{"path":"base64"}}`. Validation happens before writing. One uploader claims the attempt, writes its private immutable prefix, and atomically changes the active pointer only if it is still the newest attempt.
 3. `POST /api/publish/:projectId/attempts/:attemptId/failure` marks an unfinished attempt failed. The server deliberately stores a generic message and source workflow link rather than caller-supplied logs, which may contain secrets.

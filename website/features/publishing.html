@@ -84,6 +84,12 @@
       </p>
       <h2>How it works</h2>
       <p>
+        After preview generation, workflow logs show when uploading starts and how long a successful
+        upload took. The server stores up to four files at a time to keep large publications moving.
+        Upload requests have a two-minute deadline. Keep the destination MGM installation updated to
+        receive publication performance fixes.
+      </p>
+      <p>
         Only explicitly listed files are uploaded. The server validates the complete set, stores it
         under an isolated publication ID, then changes the visible pointer atomically. Old or failed
         uploads cannot replace a newer successful set. Publishing does not deploy the viewer or need

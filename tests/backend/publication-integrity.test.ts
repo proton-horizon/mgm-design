@@ -164,6 +164,41 @@ afterAll(async () => {
 });
 
 describe('publication integrity under storage interruptions', () => {
+  it('stores a bounded group concurrently without activating while any file is pending', async () => {
+    const { id, token, initial } = await createProject('bounded-upload');
+    const attempt = `${id}-next`;
+    await register(id, token, attempt, 2);
+    const value = bundle(id, 'complete upload');
+    for (let index = 0; index < 6; index++) {
+      const path = `app/asset-${index}.txt`;
+      value.manifest.files.push(path);
+      Object.assign(value.files, { [path]: Buffer.from(String(index)).toString('base64') });
+    }
+    const gates = value.manifest.files.map((path) => pauseWrite(`${id}/${attempt}/${path}`));
+    const entered = new Set<number>();
+    gates.forEach((gate, index) => {
+      void gate.reached.then(() => entered.add(index));
+    });
+    const pending = request(`/api/publish/${id}/attempts/${attempt}`, 'PUT', value, token);
+    try {
+      await Promise.all(gates.slice(0, 4).map((gate) => atWrite(gate, pending)));
+      expect([...entered].sort()).toEqual([0, 1, 2, 3]);
+      await expectPreview(await projectView(id), `${id}:initial`);
+      gates[0].release(true);
+      await atWrite(gates[4], pending);
+      expect([...entered].sort()).toEqual([0, 1, 2, 3, 4]);
+      expect((await projectView(id)).activePublication.id).toBe(initial.activePublication.id);
+    } finally {
+      gates.forEach((gate) => gate.release(true));
+    }
+    expect((await pending).status).toBe(200);
+    const bucket = await mf.getR2Bucket('MOCKS');
+    for (const path of value.manifest.files) {
+      expect(await bucket.head(`${id}/${attempt}/${path}`)).not.toBeNull();
+    }
+    await expectPreview(await projectView(id), 'complete upload');
+  });
+
   it('preserves the complete active snapshot after a real partial R2 write, timeout and failed retry', async () => {
     const { id, token, initial } = await createProject('interrupted');
     const attempt = `${id}-partial`;
@@ -173,9 +208,9 @@ describe('publication integrity under storage interruptions', () => {
     try {
       await atWrite(gate, pending);
       const bucket = await mf.getR2Bucket('MOCKS');
-      expect(await (await bucket.get(`${id}/${attempt}/app/index.html`))!.text()).toContain(
-        `${id}:partial`,
-      );
+      await expect
+        .poll(async () => (await bucket.get(`${id}/${attempt}/app/index.html`))?.text())
+        .toContain(`${id}:partial`);
       expect(await bucket.get(`${id}/${attempt}/app/main.js`)).toBeNull();
       const during = await projectView(id);
       expect(during.publication).toMatchObject({ id: attempt, status: 'uploading' });
